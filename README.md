@@ -58,7 +58,7 @@ The full inventory, including the capture commands, is in
 | Repository | Path in this workspace | Role |
 | --- | --- | --- |
 | [UniXNU](https://github.com/UniXNU/UniXNU) | `../UniXNU` | build driver, ARM64 profile, OS profile, UEFI package |
-| `UniXNU-sm7475-common` | `../UniXNU-sm7475-common` | shared SM7475 DTSI and SMP/cluster patches |
+| [`UniXNU-sm7475-common`](https://github.com/MiLacy/UniXNU-sm7475-common) | `../UniXNU-sm7475-common` | shared SM7475 DTSI and SMP/cluster patches |
 | `UniXNU-marble` | this directory | board configuration, DTS, package and test record |
 | `Mu-Silicium-marble` | `../Mu-Silicium-marble` | UEFI platform, marble DSC/FDF and firmware DTB |
 

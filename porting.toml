@@ -16,8 +16,8 @@ configuration = ["board.toml selects soc_source=sm7475, kit=marble and the iPadO
 procedure = ["Run ./unixnu defconfig marble_defconfig, fetch, status and tree from the main UniXNU checkout; inspect the resolved sources and output path."]
 findings = ["The common ADT generator now emits AAPL,phandle instead of the FDT spelling phandle. XNU's AddPHandle/IODTFindInterruptParent look up AAPL,phandle; without the rename the UFS interrupt-parent resolved to NULL and IODTGetICellCounts() data-aborted at PC 0xfffffff0078ec2d4 (ESR 0x96000005, FAR 0).", "The board is SM7475-AB (Cape), not SM8550. The CPU topology is 4x A510, 3x A710 and 1x X2, so the shared DTSI differs from SM8550 even though GIC and UFS addresses match.", "The apps-SMMU stream from the vendor DT is 0xE0, while upstream ShengUfs programs 0x60. The local drivers/ShengUfs fork adds native-ufs-stream with a 0xE0 default.", "The stock marble UEFI port provides Resources/DTBs/marble.dtb. The port adds Resources/DTBs/marble-unixnu.dtb with the stale /chosen initrd properties removed, keeping the splash region, so the bootloader can publish the actual payload range and the board does not add a duplicate [[bootimg.dtb_node]]."]
 completion = ["All source pins resolve; status shows the intended SoC, OS and device layers; the device tree compiles."]
-limits = ["The SM7475 shared repository is local to this workspace and has no published remote yet. feeds.toml points at it with a local override."]
-next_action = ["Publish UniXNU-sm7475-common, replace the local feed override with an exact commit, and run the status check on a clean clone."]
+limits = ["The SM7475 shared repository is published at https://github.com/MiLacy/UniXNU-sm7475-common and pinned to fc78deda27304248186fec2320c5678c45d8e431."]
+next_action = ["Run the status check on a clean clone of the published repositories."]
 evidence = [
   { kind = "source", reference = "board.toml", result = "Board identity, component selection, firmware paths and payload inputs." },
   { kind = "source", reference = "dts/marble.dts", result = "Board memory, splash reservation and CPU cluster tags." },
