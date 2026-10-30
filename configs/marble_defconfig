@@ -1,0 +1,33 @@
+# First-console configuration for marble (SM7475).
+#
+# This boots XNU to the platform expert and the console before the storage
+# and display stacks are enabled. The full userland chain needs the verified
+# root bundle, a Data seed, the legacy display archive and the PMGR
+# placeholder; docs/FULL-SYSTEM.md lists that work.
+CONFIG_XNU_BUILD_ARCHIVES=y
+CONFIG_XNU_ARM_DT_PLATFORM=y
+CONFIG_XNU_ARMCPU=y
+CONFIG_XNU_SOURCE_CORECRYPTO14=y
+CONFIG_XNU_SOURCE_PTHREAD=y
+CONFIG_XNU_CRYPTO_BOOTSTRAP="prelinked"
+CONFIG_XNU_NATIVE_AES=y
+CONFIG_XNU_NATIVE_ARCH_TIMER=y
+CONFIG_XNU_NATIVE_PAN=y
+CONFIG_XNU_NATIVE_UFS=y
+CONFIG_XNU_SHENG_PMGR=y
+CONFIG_XNU_DT_PANIC_REGION=y
+CONFIG_XNU_ARMVIRT_PLATFORM=n
+CONFIG_XNU_NATIVE_MOBILE_DISPLAY=n
+CONFIG_XNU_NATIVE_LEGACY_DISPLAY=n
+CONFIG_XNU_NATIVE_ADRENO=n
+CONFIG_XNU_EXTRA_LD_ARCHIVES="{tree}/build/marble-stubs/libMarbleStubs.a"
+
+# The owner/verified-root and Data chain is a later stage:
+# CONFIG_XNU_VERIFIED_ROOT_PROBE is not set
+# CONFIG_XNU_OWNER_ROOT_AUDIT is not set
+# CONFIG_XNU_OWNER_ROOT_TRUST is not set
+# CONFIG_XNU_NATIVE_VIRTIO_BLOCK is not set
+# CONFIG_XNU_NATIVE_RAM_BLOCK is not set
+# CONFIG_XNU_OWNER_DATA_MOUNT is not set
+# CONFIG_XNU_OWNER_UNION_SYSTEMOS is not set
+# CONFIG_XNU_BOOT_PROGRESS is not set

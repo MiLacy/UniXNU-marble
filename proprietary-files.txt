@@ -1,0 +1,10 @@
+# Required firmware inputs: relative path | source | SHA-256 | consumer
+#
+# The first console configuration consumes no proprietary files from this
+# repository. The marble UEFI vendor modules and panel XML files are already
+# part of the Mu-Silicium-marble checkout under Binaries/marble.
+#
+# Later stages need these user-supplied inputs (never commit them):
+#   Goodix GT9916S firmware/configuration images, if a touch driver is added.
+#   The iPadOS 17.7.11 kernelcache, trust caches and Data seed, supplied to
+#   the payload step through unixnu.local.toml or command-line paths.

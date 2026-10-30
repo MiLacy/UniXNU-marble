@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Redmi Note 12 Turbo / POCO F5 (marble), Qualcomm SM7475-AB.
+//
+// Memory and splash region come from the stock marble device tree shipped in
+// Mu-Silicium-marble Resources/DTBs/marble.dts. The 2 GiB memory node is the
+// contiguous handoff range requested from the firmware; payload.adt requests
+// a separate 4 GiB owned window. The board has 8 or 12 GiB, but the loader
+// places its window in firmware free memory rather than at a fixed address.
+
+/dts-v1/;
+/include/ "sm7475.dtsi"
+
+/ {
+    model = "Redmi Note 12 Turbo / POCO F5";
+    compatible = "xiaomi,marble", "qcom,sm7475";
+
+    memory@80000000 {
+        device_type = "memory";
+        reg = <0 0x80000000 0 0x80000000>;
+    };
+
+    reserved-memory {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        ranges;
+
+        splash_region: splash_region@b8000000 {
+            label = "cont_splash_region";
+            reg = <0 0xb8000000 0 0x2b00000>;
+            no-map;
+        };
+    };
+};
+
+// SM7475 has four Cortex-A510 cores and four performance cores. XNU's Edge
+// scheduler uses two clusters: E for the A510s and P for the A710/X2 group.
+&cpu0 { unixnu,cluster-type = "E"; };
+&cpu1 { unixnu,cluster-type = "E"; };
+&cpu2 { unixnu,cluster-type = "E"; };
+&cpu3 { unixnu,cluster-type = "E"; };
+&cpu4 { unixnu,cluster-type = "P"; };
+&cpu5 { unixnu,cluster-type = "P"; };
+&cpu6 { unixnu,cluster-type = "P"; };
+&cpu7 { unixnu,cluster-type = "P"; };
+
+&ufs { status = "okay"; };
+&ufsphy { status = "okay"; };

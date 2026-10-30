@@ -1,0 +1,9 @@
+# The SM7475 shared profile lives beside this repository in the local
+# workspace. Replace `local` with the published repository URL and commit
+# before publishing this port.
+[[source]]
+name = "sm7475"
+kind = "soc"
+git = "https://github.com/UniXNU/UniXNU-sm7475-common.git"
+commit = "0000000000000000000000000000000000000000"
+local = "../UniXNU-sm7475-common"

@@ -1,0 +1,131 @@
+schema_version = 2
+
+[board]
+name = "marble"
+soc = "SM7475"
+soc_source = "sm7475"
+os_profile = "ipados-17.7.11-21H461"
+description = "Redmi Note 12 Turbo / POCO F5 (marble), Qualcomm SM7475 (Snapdragon 7+ Gen 2)"
+kit = "marble"
+
+[components]
+# First bring-up selection: platform expert, CPU/GIC, source crypto, UFS,
+# prelink and the UEFI loader. GopFramebuffer is selected for the display
+# path but stays disabled in marble_defconfig until the console boot is
+# established on hardware.
+include = [
+  "ArmDTPlatform",
+  "ArmCpu",
+  "SoftwareAES",
+  "ShengUfs",
+  "GopFramebuffer",
+  "XnuPrelink",
+  "DarwinBoot",
+  "QcomGeniSpi",
+]
+
+[kernel]
+defconfig = "marble_defconfig"
+config_fragments = ["arch:configs/common.config", "soc:configs/sm7475.config", "os:configs/ipados.config"]
+patch_series = ["arch:patches/xnu/series", "soc:patches/xnu/series", "os:patches/xnu/series", "device:patches/xnu/series"]
+archives = [
+  "build-corecrypto-14.py",
+  "build-corecrypto-14.py --namespace",
+  "component:ArmDTPlatform",
+  "component:ArmCpu",
+  "component:SoftwareAES",
+  "component:ShengUfs",
+  "component:VirtioMmioBlock",
+  "build-software-aes-bindings.py",
+  "build-marble-stubs.py",
+  "build-mockfs-fixture.py",
+  "build-libpthread-kernel.py",
+  "build-platform-power.py",
+]
+
+[device_tree]
+source = "device:dts/marble.dts"
+include_dirs = ["soc:dts"]
+
+[firmware]
+config = "marble"
+dsc = "Platforms/Xiaomi/marblePkg/marble.dsc"
+fd = "Build/marblePkg/{target}_CLANGPDB/FV/SILICIUM_UEFI.fd"
+# The vendor modules in the Mu-Silicium checkout are already initialized.
+submodules = ["Common/Mu", "Common/Mu_OEM_Sample", "Silicium-ACPI", "Silicon/Silicium/OpensslPkg/Library/OpensslLib/openssl"]
+patches = [
+  "Resources/MuPatches/Auth-Service.patch",
+  "Resources/MuPatches/Boot-Manager.patch",
+  "Resources/MuPatches/Timer.patch",
+  "Resources/MuPatches/Usb-Bus.patch",
+]
+packages = [
+  "{uefi}",
+  "{uefi}/Platforms/Xiaomi",
+  "{tree}/package",
+  "{tree}/drivers/DarwinBoot",
+  "{edk2}",
+  "{uefi}/Common/Mu",
+  "{uefi}/Common/Mu_OEM_Sample",
+  "{uefi}/Silicon/Qualcomm",
+  "{uefi}/Silicon/Silicium",
+  "{uefi}/Silicium-ACPI",
+  "{uefi}/Silicium-ACPI/Platforms/Xiaomi",
+  "{uefi}/Silicium-ACPI/SoCs/Qualcomm",
+]
+
+[firmware.defines]
+# 0 matches the stock Mu-Silicium build default. The XNU loader is embedded
+# in the firmware volume, so image verification does not depend on the
+# platform secure-boot switch.
+ENABLE_SECUREBOOT = "0"
+DEVICE_MODEL = "marble"
+
+[payload]
+volume = "MARBLEESP"
+size_mib = 64
+loader = "firmware"
+title = "UniXNU marble"
+panic_screen = true
+# First console bring-up. Add native-ufs-root=1, sheng-smp=1 and the
+# display arguments after the kernel reaches the platform expert on the
+# device. See docs/REAL-DEVICE-TESTS.md.
+kernel_args = ["-v", "serial=3", "debug=0x14e", "cpus=8", "native-ufs-stream=0xe0", "native-ufs-probe=10", "native-ufs-smmu-takeover=1", "sheng-pmgr=2", "-no_slto_panic"]
+
+[payload.adt]
+chip_id = "207"
+owned_memory_size = "0x100000000"
+root_match_volume_uuid = "04769D26-2CA0-4825-B443-E2E5F88300F2"
+unique_chip_id = "required"
+ipad_identity = true
+
+# Android boot image v0: the fastboot boot path on marble does not reliably
+# load the v4 ramdisk. The kernel lands at 0x80008000 and the 64 MiB payload
+# at 0x80c00000-0x84c00000, below the PIL reservation at 0x85200000.
+[bootimg.image]
+base = 0x80000000
+kernel_offset = 0x8000
+ramdisk_offset = 0xC00000
+tags_offset = 0x100
+pagesize = 4096
+header_version = 0
+
+# The bootloader may not rewrite /chosen for a fastboot boot image. Keep the
+# initrd range in the appended DTB equal to the v0 header's ramdisk address.
+[[bootimg.dtb_node]]
+path = "/chosen"
+props = [
+  { name = "linux,initrd-start", type = "x", value = "0x80C00000" },
+  { name = "linux,initrd-end", type = "x", value = "0x84C00000" },
+]
+
+# Measured on the phone with the read-only UFS probe (2026-10-31):
+# GPT entry "userdata" on LUN 0, 4096-byte LBAs, 224.2 GiB.
+[userdata]
+first_lba = 0x2f6a00
+last_lba = 0x3b037fa
+lba_bytes = 4096
+windows = [
+  { name = "OS", component = "OS" },
+  { name = "SystemOS", component = "Cryptex1,SystemOS" },
+]
