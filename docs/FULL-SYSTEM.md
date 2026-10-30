@@ -1,14 +1,41 @@
 # Full-system roadmap
 
-`marble_defconfig` builds the first-console kernel. It does not select the
-UFS component: without the verified-root bundle the driver cannot publish a
-root. Reaching SpringBoard on marble needs the same userland chain sheng and
-alioth use, with apples-to-apples inputs. This page lists the switches,
-archives and board files in the order they should be enabled. Do not turn on a
-switch whose archive or policy input does not exist; the kernel build checks
-some of them and fails at the link.
+`marble_defconfig` builds the full UFS root kernel. It selects `ShengUfs`,
+links the block-storage class against the original `IOBlockStorageDevice` ABI
+and passes `native-ufs-root=1`, but the root is **unverified**: the
+verified-root bundle, the owner-root policy and the Data seed are not built.
+Reaching SpringBoard on marble needs the same userland chain sheng and alioth
+use, with apples-to-apples inputs. This page lists the switches, archives and
+board files in the order they should be enabled. Do not turn on a switch whose
+archive or policy input does not exist; the kernel build checks some of them
+and fails at the link.
 
-## 1. Verified storage and root
+## 1. Storage root
+
+The current image uses the original IOStorageFamily base class directly. The
+non-probe UFS block class subclasses `IOBlockStorageDevice`, whose vtable,
+constructors, destructors, metaclass and inherited methods live in the
+prelinked IOStorageFamily kext.
+
+| Item | Value |
+| --- | --- |
+| `CONFIG_XNU_NATIVE_UFS=y` | `drivers/ShengUfs`, board fork `e2b32cc` |
+| `CONFIG_XNU_NATIVE_UFS_FULL=y` | selects `NativeUfsBlock` and the storage bindings |
+| `native-ufs-root=1` | publishes the userdata `OS`/`SystemOS` windows as root |
+| `native-ufs-stream=0xe0` | SM7475 apps-SMMU stream |
+| `native-ufs-smmu-takeover=1` | reuse the firmware's exclusive SMR bank 2 |
+| `scripts/data/native-storage-original-bindings.S` | absolute ABI bindings from the 21H461 prelink |
+| `scripts/build-storage-bindings.py` | compiles and archives the bindings into `libShengUfs.a` |
+
+The binding addresses come from the reference `IOBlockStorageDevice.o`
+(190 slots, 14 pure virtual) and the built `kernel.macho`/`kernel.json`
+symbol scan. The table base (`0xfffffff005cb44c0`) still matches the
+`__DATA_CONST` address in the full kernel, and `NativeUfsBlock` is present in
+the linked kernel.
+
+### Verified root (not built)
+
+The verified-root chain is the next step after the unverified root test:
 
 | Switch | Archive / input |
 | --- | --- |
@@ -22,11 +49,8 @@ some of them and fails at the link.
 The verified-root bundle is built from the selected OS/SystemOS images and the
 trust caches of the 21H461 restore. The exact builder and policy inputs are
 recorded in the sheng and alioth storage records; the same iPadOS profile is
-used here. Once the bundle exists, add `native-ufs-root=1` to
-`[payload] kernel_args`.
-
-The board fork `drivers/ShengUfs` defaults to apps-SMMU stream `0xE0`; keep
-`native-ufs-stream=0xe0` in the command line so the value is visible in logs.
+used here. Do not enable these switches without the bundle and policy: the
+build fails at the link or the kernel rejects the root at authentication.
 
 ### Userdata geometry
 
@@ -148,12 +172,15 @@ is a source-backed implementation and a device observation.
 
 ## Order of verification
 
-1. Console kernel (current `marble_defconfig`).
-2. UFS register read + GPT + userdata partition (no root publish).
-3. Verified root + Data seed + launchd.
-4. Display stack + Hello/SpringBoard.
-5. Touch.
-6. GPU/Wi-Fi/audio/power.
+1. Console kernel (verified on marble).
+2. UFS register read + GPT + userdata partition (verified on marble; probe
+   geometry recorded).
+3. Unverified full UFS root + userdata image (built on host; awaiting the
+   marble test).
+4. Verified root + Data seed + launchd.
+5. Display stack + Hello/SpringBoard.
+6. Touch.
+7. GPU/Wi-Fi/audio/power.
 
 Record each result in `porting.toml` and update
 [docs/REAL-DEVICE-TESTS.md](REAL-DEVICE-TESTS.md) with the observed stage.

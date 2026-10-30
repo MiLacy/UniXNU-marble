@@ -123,8 +123,11 @@ python3 out/marble/ipados-17.7.11-21H461/marble/tree/scripts/make-marble-trust.p
 fastboot boot out/marble/ipados-17.7.11-21H461/marble/boot/boot.img
 ```
 
-The built payload image SHA-256 is
-`c615520c88e79e78d170bc1309b132a3f4465017cab46ae8f5bfd887cc2931b9`.
+The Stage 2 result recorded with the first-console image was
+`c615520c88e79e78d170bc1309b132a3f4465017cab46ae8f5bfd887cc2931b9`. The
+current `boot.img` is the Stage 3 full UFS root image
+`ce8b5f6e57c716ecf0605839734bd2806d4ae470c83d96eb829842caff6147cc`; use it
+for the storage stage below.
 
 Expected:
 
@@ -158,75 +161,88 @@ Common failures:
 | no kernel log | boot arguments, serial selection, framebuffer base |
 | no display | use the framebuffer console; the legacy display stack is a later stage |
 
-The first-console defconfig does not enable `native-ufs-root=1` or the
-display stack. The kernel should reach the platform expert without touching
-UFS or the panel.
+The Stage 2 image did not enable `native-ufs-root=1` or the display stack,
+so the kernel reached the platform expert without touching UFS or the panel.
+The current defconfig enables the full UFS root; Stage 2 above records the
+historical first-console result.
 
-Expected stop: with the PMGR placeholder enabled, AMFI and IOKit should pass;
-the kernel then has no root device. It waits for a root and panics (or prints
-the root-device timeout). That is the correct result for this image: Stage 2
-proves kernel entry, platform setup and IOKit, not userland. Record the exact
-panic; it is the starting point for Stage 3.
+Expected stop for the Stage 2 image: with the PMGR placeholder enabled, AMFI
+and IOKit should pass; the kernel then has no root device. It waits for a root
+and panics (or prints the root-device timeout). That was the correct result
+for that image: Stage 2 proves kernel entry, platform setup and IOKit, not
+userland. Stage 3 below is the root stage.
 
 ---
 
-## Stage 3a — UFS read-only probe
+## Stage 3a — UFS read-only probe (completed)
 
-The current `boot.img` is a **probe image**: it selects `ShengUfs` in probe-only
-mode and passes `native-ufs-probe=10`. It does not write userdata.
-
-```sh
-fastboot boot out/marble/ipados-17.7.11-21H461/marble/boot/boot.img
-```
-
-Expected panic text (capture the whole block):
+The probe image selected `ShengUfs` in probe-only mode and passed
+`native-ufs-probe=10`. It did not write userdata. Observed on marble
+2026-10-31:
 
 ```text
 NATIVE_UFS root check
-userdata first=<hex> last=<hex>
-block0 magic <hex> <hex> ext4magic=<hex> ext4blocks=<n>
-manifest status=<n> windows=<n>
+userdata first=2f6a00 last=3b037fa
+block0 magic a677e784 c7b59c23 ext4magic=c6cf ext4blocks=217367362
+manifest status=1 windows=0
 ```
 
-The probe validates the SM7475 UFS host, GCC and apps-SMMU stream `0xE0`, and
-prints the GPT geometry needed for `board.toml [userdata] first_lba/last_lba`.
-If `hostBringUp` fails, the panic names the UFS/GCC/SMMU stage; send that text.
-No data is written.
+The earlier probe run also established the SMMU takeover: the firmware leaves
+an exclusive SMR `0x800000e0` (slot 2) mapped to translating context bank 2
+(`s2cr=2`, `id2=5111`). `native-ufs-smmu-takeover=1` reuses that bank after
+clearing `SCTLR`/`CBAR`, and the retry range now covers all 128 context banks.
+The geometry is in `board.toml [userdata]`; `manifest status=1 windows=0`
+means the partition is the Android ext4 userdata, not a `SHNGROOT` image.
 
 ## Stage 3 — System entry
 
-**请使用 marble 实机测试：写入 userdata 后启动完整 payload，确认根卷挂载、
-`launchd` 启动并出现启动进度或 Hello 画面。**
+**请使用 marble 实机测试：先备份 Android 数据，刷入 userdata 镜像，再启动
+完整 UFS root 镜像，确认根卷挂载、`launchd` 启动并记录最终的 panic 或启动
+进度。**
 
-Stage 3 needs the full-system configuration described in
-[FULL-SYSTEM.md](FULL-SYSTEM.md):
+The current full UFS root build is **unverified root without a Data seed**.
+`CONFIG_XNU_VERIFIED_ROOT_PROBE`, `CONFIG_XNU_OWNER_ROOT_AUDIT`,
+`CONFIG_XNU_OWNER_ROOT_TRUST` and the Data chain are off. Expected outcomes:
 
-1. Enable `CONFIG_XNU_VERIFIED_ROOT_PROBE`, `CONFIG_XNU_OWNER_ROOT_AUDIT`,
-   `CONFIG_XNU_OWNER_ROOT_TRUST`, `CONFIG_XNU_NATIVE_VIRTIO_BLOCK`,
-   `CONFIG_XNU_NATIVE_RAM_BLOCK`, `CONFIG_XNU_OWNER_DATA_MOUNT`,
-   `CONFIG_XNU_OWNER_UNION_SYSTEMOS` and the matching archive paths.
-2. Build the verified-root bundle, the Data seed and the userdata image.
-3. Fill `[userdata]` from the phone's GPT.
-4. Add `native-ufs-root=1`, `native-ufs-stream=0xe0` and the Data arguments.
-5. Flash `userdata`:
-   ```sh
-   fastboot flash userdata out/marble/ipados-17.7.11-21H461/marble/userdata/userdata-root.img
-   ```
-6. Boot the matching image.
+- best case: the root volume mounts and `launchd` starts, then stops because
+  `/private/var` (Data) does not exist;
+- likely: root authentication rejects the unverified OS/SystemOS images and
+  the kernel panics with the exact authentication text to capture.
+
+Inputs:
+
+- `/home/lacy/WorkSpace/UniXNU/out/marble/ipados-17.7.11-21H461/marble/userdata/userdata-root.img`
+  (9,382,658,048 bytes, SHA-256
+  `fd43ee7035ce185ce4215ac93fdc006fd784a54b3b7442e21457c226cbe03093`);
+- the matching full kernel `kernel.macho` SHA-256
+  `c3ea36a2b438f2f84bca0e342699b9640dfb61a7631463576674a1b63a1795bd`;
+- the current `boot.img` SHA-256
+  `ce8b5f6e57c716ecf0605839734bd2806d4ae470c83d96eb829842caff6147cc`.
+
+**Flashing `userdata` erases Android user data.** Back up first. `fastboot
+boot` still only boots the image; the boot partition is not replaced.
+
+```sh
+adb reboot bootloader
+fastboot devices
+fastboot flash userdata /home/lacy/WorkSpace/UniXNU/out/marble/ipados-17.7.11-21H461/marble/userdata/userdata-root.img
+fastboot boot /home/lacy/WorkSpace/UniXNU/out/marble/ipados-17.7.11-21H461/marble/boot/boot.img
+```
 
 Expected:
 
 - UFS logs the link speed, command queue and apps-SMMU stream `0xE0`.
-- The partition scheme publishes `OS` and `SystemOS`.
+- `NativeUfsBlock` publishes the `OS` and `SystemOS` windows from the
+  userdata image.
 - The root volume UUID matches
   `04769D26-2CA0-4825-B443-E2E5F88300F2`.
-- XNU mounts the root and starts `launchd`.
-- The display shows boot progress or the Hello screen.
+- XNU mounts the root and starts `launchd`, or panics with the unverified-root
+  authentication text.
 
 Capture:
 
 - The UFS log (`NativeUfs:` lines), the root-matching line and the first
-  `launchd` line.
+  `launchd` line or the panic block.
 - A photo of the screen at the last visible state.
 - The `userdata` report (`userdata-root.json`) and the image SHA-256.
 
@@ -234,8 +250,15 @@ If the root does not mount:
 
 1. Verify the GPT first/last LBA and the 4096-byte logical block size.
 2. Confirm the data image was built from the same 21H461 IPSW.
-3. Confirm `native-ufs-stream=0xe0` is in the packed command line.
-4. Check the verified-root policy covers the actual OS/SystemOS images.
+3. Confirm `native-ufs-stream=0xe0`, `native-ufs-smmu-takeover=1` and
+   `native-ufs-root=1` are in the packed command line.
+4. If the panic names an unresolved IOStorageFamily method or a bad vtable,
+   the storage bindings do not match the running prelink; rebuild with
+   `XNU_NATIVE_UFS_FULL=1` and re-check the symbols listed in
+   `scripts/data/native-storage-original-bindings.S`.
+5. If authentication rejects the root, the next step is the verified-root
+   bundle (`CONFIG_XNU_VERIFIED_ROOT_PROBE` and the owner-root audit/trust
+   switches), not a kernel change.
 
 ---
 

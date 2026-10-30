@@ -13,9 +13,9 @@ every stage below must be verified on a physical marble.
 
 | Stage | State | What runs |
 | --- | --- | --- |
-| 1. UEFI / UniXNU menu | built on host | `UniXNU.efi`, `UniXNUDxe`, `UniXNURamDiskDxe` and `DarwinBoot` are in the 3 MiB marble firmware volume |
-| 2. XNU kernel entry | built on host | XNU 10063.141.1 with the SM7475 SMP/cluster patches; payload carries the kernel, ADT and the two original trust caches |
-| 3. System entry | roadmap | requires the verified-root bundle, a Data seed and the legacy display archive; the PMGR placeholder is already enabled for AMFI. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
+| 1. UEFI / UniXNU menu | verified on marble | `UniXNU.efi`, `UniXNUDxe`, `UniXNURamDiskDxe` and `DarwinBoot` are in the 3 MiB marble firmware volume |
+| 2. XNU kernel entry | verified on marble | XNU 10063.141.1 with the SM7475 SMP/cluster patches; payload carries the kernel, ADT and the two original trust caches |
+| 3. System entry | built on host, awaiting device test | full UFS root build: the UFS controller, SMMU takeover and `NativeUfsBlock` are linked against the original `IOBlockStorageDevice` ABI, and an 8.8 GiB `OS`/`SystemOS` userdata image is written. The root is **unverified**: no verified-root bundle and no Data seed. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
 
 **Please test on a real marble at every stage.** The exact prompts, commands
 and observations to capture are in [REAL-DEVICE-TESTS.md](docs/REAL-DEVICE-TESTS.md).
@@ -25,15 +25,17 @@ and observations to capture are in [REAL-DEVICE-TESTS.md](docs/REAL-DEVICE-TESTS
 | Artifact | SHA-256 |
 | --- | --- |
 | `boot-empty.img` (Stage 1) | `823a96d29602be5d2a678f8f9ecc054254b6f5c7482eaa3743be66069a6dc28d` |
-| `boot.img` (Stage 2) | `c615520c88e79e78d170bc1309b132a3f4465017cab46ae8f5bfd887cc2931b9` |
+| `boot.img` (full UFS root) | `ce8b5f6e57c716ecf0605839734bd2806d4ae470c83d96eb829842caff6147cc` |
 | Firmware FD (3 MiB) | `6c52e8a4dcdd1483d7ca672de67725f8c76a60ececa956ba81d38a3aa4f7d4b4` |
 | Firmware DTB | `58dca5dbe30e2d0f8ba599f3ff8d0c72b691ab07895cbf09807e67a136fbd2b3` |
-| `kernel.macho` | `e681a0b8e09f666703594025ccf13890db72a939c0f523c5cb51b340e5b8281a` |
+| `kernel.macho` (full UFS root) | `c3ea36a2b438f2f84bca0e342699b9640dfb61a7631463576674a1b63a1795bd` |
+| `userdata-root.img` (8.8 GiB) | `fd43ee7035ce185ce4215ac93fdc006fd784a54b3b7442e21457c226cbe03093` |
 | Trust bundle | `7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7` |
 
 The images are under
-`../UniXNU/out/marble/ipados-17.7.11-21H461/marble/boot/`. `hardware_tested`
-is false in both `boot.json` files.
+`../UniXNU/out/marble/ipados-17.7.11-21H461/marble/boot/` and
+`.../marble/userdata/`. `hardware_tested` is false in `boot.json`: the full
+UFS root image has not been run on marble yet.
 
 ## Hardware summary
 
@@ -63,9 +65,20 @@ The full inventory, including the capture commands, is in
 | `Mu-Silicium-marble` | `../Mu-Silicium-marble` | UEFI platform, marble DSC/FDF and firmware DTB |
 
 `drivers/ShengUfs` is a board fork of the catalog component at
-`e2b32cc429e8cf1501161c1d8c517f8994ceb9b2`. Its only functional change is the
-apps-SMMU stream override: SM7475 uses `0xE0`, while the SM8550 driver
-programs `0x60`. The boot argument `native-ufs-stream=0xe0` selects marble.
+`e2b32cc429e8cf1501161c1d8c517f8994ceb9b2`. Its changes are the apps-SMMU
+stream override: SM7475 uses `0xE0`, while the SM8550 driver programs `0x60`,
+and the `native-ufs-smmu-takeover=1` path that reuses the firmware's
+exclusive SMR/context bank 2 (the SM8550 layout). The boot arguments
+`native-ufs-stream=0xe0` and `native-ufs-smmu-takeover=1` select marble.
+
+The full (non-probe) block class subclasses the original
+`IOBlockStorageDevice`, which lives in the prelinked IOStorageFamily kext.
+`scripts/data/native-storage-original-bindings.S` binds that ABI (vtable,
+constructors, destructors, metaclass and the inherited method slots) from the
+21H461 prelink; `scripts/build-storage-bindings.py` compiles and archives it
+into `libShengUfs.a` when `XNU_NATIVE_UFS_FULL=1`. The addresses were
+recovered from the reference `IOBlockStorageDevice.o` (190 slots, 14 pure
+virtual) and the built `kernel.macho` symbol table.
 
 ## Build
 
@@ -107,7 +120,7 @@ Kernel and payload (external inputs required):
 ./unixnu ipsw fetch -D ../UniXNU-marble StaticTrustCache Cryptex1,SystemTrustCache
 python3 out/marble/ipados-17.7.11-21H461/marble/tree/scripts/make-marble-trust.py
 
-# payload: kernel, ADT and trust cache; no Data seed for the first console
+# payload: kernel, ADT and trust cache; the current build has no Data seed
 ./unixnu build payload -D ../UniXNU-marble \
   --uefi ../Mu-Silicium-marble \
   --trust-cache out/marble/ipados-17.7.11-21H461/marble/tree/build/marble-trust.bundle \
@@ -191,16 +204,20 @@ is discovered and the `no boot entry found` notice is gone. The kernel
 continues past `fiq_context_init` and the ADT interrupt map. With the
 PMGR placeholder it should pass AMFI and stop at the missing root device.
 
-The current `boot.img` is a **read-only UFS probe** (`native-ufs-probe=10`),
-not the full root image. It intentionally panics after reading the userdata GPT
-so the first/last LBA and manifest state can be captured for `[userdata]`.
-See [Stage 3a](docs/REAL-DEVICE-TESTS.md#stage-3a--ufs-read-only-probe).
+The current `boot.img` is the **full UFS root image** (`native-ufs-root=1`),
+paired with `userdata-root.img`. The earlier read-only probe
+(`native-ufs-probe=10`) recorded the geometry: `userdata` first `0x2f6a00`,
+last `0x3b037fa` (4096-byte LBAs), no `SHNGROOT` manifest. Flashing the
+userdata image overwrites Android user data; back up first. See
+[Stage 3](docs/REAL-DEVICE-TESTS.md#stage-3--system-entry).
 
 ## Known gaps
 
-- The UFS component, verified-root bundle and Data seed are not selected in
-  the first-console defconfig. The board fork is kept in `drivers/ShengUfs`
-  for the storage stage; see [FULL-SYSTEM.md](docs/FULL-SYSTEM.md).
+- The root is **unverified**: `CONFIG_XNU_VERIFIED_ROOT_PROBE`,
+  `CONFIG_XNU_OWNER_ROOT_AUDIT` and `CONFIG_XNU_OWNER_ROOT_TRUST` are off, so
+  the kernel may stop at root authentication. There is no Data seed, so
+  `/private/var` is expected to be missing after the root mounts. See
+  [FULL-SYSTEM.md](docs/FULL-SYSTEM.md).
 - The legacy GOP display stack is not enabled in `marble_defconfig`; the
   first console uses the XNU framebuffer console. Enabling it requires the
   board display probe and archive described in [FULL-SYSTEM.md](docs/FULL-SYSTEM.md).
@@ -208,8 +225,8 @@ See [Stage 3a](docs/REAL-DEVICE-TESTS.md#stage-3a--ufs-read-only-probe).
   panics on unimplemented power operations.
 - Touch (Goodix GT9916S), GPU acceleration (Adreno 725), Wi-Fi, cellular,
   audio, camera and battery are not implemented.
-- `[userdata]` geometry is intentionally absent until measured from the
-  phone's GPT.
+- `[userdata]` geometry is measured (`0x2f6a00-0x3b037fa`), but the userdata
+  image has been written only on the host; it has not been flashed to marble.
 
 ## Links
 

@@ -1,9 +1,8 @@
-# First-console configuration for marble (SM7475).
+# Full UFS root configuration for marble (SM7475).
 #
-# This boots XNU to the platform expert and the console before the storage
-# and display stacks are enabled. The full userland chain needs the verified
-# root bundle, a Data seed, the legacy display archive and the PMGR
-# placeholder; docs/FULL-SYSTEM.md lists that work.
+# This boots XNU with the full UFS block driver and an unverified root; the
+# display stack, verified-root bundle and Data seed are later stages.
+# docs/FULL-SYSTEM.md lists that work.
 CONFIG_XNU_BUILD_ARCHIVES=y
 CONFIG_XNU_ARM_DT_PLATFORM=y
 CONFIG_XNU_ARMCPU=y
@@ -14,6 +13,7 @@ CONFIG_XNU_NATIVE_AES=y
 CONFIG_XNU_NATIVE_ARCH_TIMER=y
 CONFIG_XNU_NATIVE_PAN=y
 CONFIG_XNU_NATIVE_UFS=y
+CONFIG_XNU_NATIVE_UFS_FULL=y
 CONFIG_XNU_SHENG_PMGR=y
 CONFIG_XNU_DT_PANIC_REGION=y
 CONFIG_XNU_ARMVIRT_PLATFORM=n

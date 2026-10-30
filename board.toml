@@ -35,6 +35,7 @@ archives = [
   "component:ArmCpu",
   "component:SoftwareAES",
   "component:ShengUfs",
+  "build-storage-bindings.py",
   "component:VirtioMmioBlock",
   "build-software-aes-bindings.py",
   "build-marble-stubs.py",
@@ -87,10 +88,10 @@ size_mib = 64
 loader = "firmware"
 title = "UniXNU marble"
 panic_screen = true
-# First console bring-up. Add native-ufs-root=1, sheng-smp=1 and the
-# display arguments after the kernel reaches the platform expert on the
-# device. See docs/REAL-DEVICE-TESTS.md.
-kernel_args = ["-v", "serial=3", "debug=0x14e", "cpus=8", "native-ufs-stream=0xe0", "native-ufs-probe=10", "native-ufs-smmu-takeover=1", "sheng-pmgr=2", "-no_slto_panic"]
+# Full UFS root bring-up: unverified root without a Data seed. Enable the
+# verified-root chain or the display arguments only when their archives exist.
+# See docs/REAL-DEVICE-TESTS.md.
+kernel_args = ["-v", "serial=3", "debug=0x14e", "cpus=8", "native-ufs-stream=0xe0", "native-ufs-smmu-takeover=1", "native-ufs-root=1", "sheng-pmgr=2", "-no_slto_panic"]
 
 [payload.adt]
 chip_id = "207"
