@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Build the display provider archive the kernel links under
+"""Build the CPU display provider archive the kernel links under
 CONFIG_XNU_NATIVE_MOBILE_DISPLAY (build/gop-framebuffer/libGopFramebuffer.late.a).
 
-The provider subclasses the prelinked original IOMobileFramebuffer (21H461
-IOMobileGraphicsFamily); its runtime symbols are bound here to the exact
-prelinked addresses (the same values the mobile-graphics checkpoints use).
+The archive carries the self-contained IOMobileFramebuffer/IOCoreSurfaceRoot
+implementation from the marble CPU-display reference; the original
+IOMobileGraphicsFamily and IOSurface kexts are removed from the prelink so the
+class names are unique.
 """
 import hashlib
 import json
@@ -16,33 +17,42 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'build/gop-framebuffer'
 OUT.mkdir(parents=True, exist_ok=True)
 
-DRIVER = ROOT / 'drivers/GopFramebuffer'
-SOURCE = DRIVER / 'NativeMobileDisplay.cpp'
+SOURCES = [ROOT / 'kits/marble/SweetDisplay/SweetSurface.cpp',
+           ROOT / 'kits/marble/SweetDisplay/SweetFramebuffer.cpp']
 BINDINGS = ROOT / 'kits/marble/gop-framebuffer-bindings.S'
 
-# Prelinked original IOMobileGraphicsFamily (iOS 17.7 21H461) runtime symbols.
-ORIGINAL = {
-    '__ZN19IOMobileFramebuffer10gMetaClassE': 0xfffffff006b313d8,
-    '__ZN19IOMobileFramebufferC2EPK11OSMetaClass': 0xfffffff00577b318,
-    '__ZN19IOMobileFramebufferD2Ev': 0xfffffff00577b364,
-}
-
 BINDINGS.parent.mkdir(parents=True, exist_ok=True)
-BINDINGS.write_text('# SPDX-License-Identifier: MIT\n' + ''.join(
-    f'.globl {name}\n.set {name}, {value:#x}\n' for name, value in ORIGINAL.items()) +
+BINDINGS.write_text('# SPDX-License-Identifier: MIT\n'
     '.text\n.p2align 2\n.globl _native_mobile_display_provider_probe\n'
     '_native_mobile_display_provider_probe:\n    ret\n')
 
-subprocess.run(['python3', str(ROOT / 'scripts/build-arm-driver.py'), 'NativeMobileDisplay'],
-               cwd=ROOT, check=True, timeout=300)
-obj = OUT / 'NativeMobileDisplay.o'
-if not obj.is_file():
-    raise SystemExit(f'{obj} missing after the component build')
-
-# The Linux llvm-objcopy cannot edit Mach-O segments; keep the object as built.
-# The archive still links, and class registration runs from the kernel's own
-# mod-init handling.
-late = obj
+record = json.loads((ROOT / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json').read_text().strip().rstrip(','))
+object_paths = []
+for source in SOURCES:
+    obj = OUT / (source.stem + '.o')
+    command = []
+    args = record['arguments']
+    index = 0
+    while index < len(args):
+        value = args[index]
+        if value == record['file']:
+            command.append(str(source))
+        elif value in ('-o', '-MF', '-MT', '-MJ'):
+            if value == '-o':
+                command += ['-o', str(obj)]
+            index += 1
+        elif value in ('-MD', '-MP'):
+            pass
+        elif value == '-Xclang' and index + 1 < len(args) and args[index + 1].startswith('-W'):
+            index += 1
+        elif value.startswith('-W'):
+            pass
+        else:
+            command.append(value)
+        index += 1
+    command += ['-DSWEET=1', '-Wno-error', '-I', str(SOURCES[0].parent)]
+    subprocess.run(command, cwd=record['directory'], check=True, timeout=180)
+    object_paths.append(obj)
 
 compiler = shutil.which('clang') or '/opt/unixnu-linux/llvm/bin/clang'
 bindings_obj = OUT / 'gop-framebuffer-bindings.o'
@@ -52,16 +62,14 @@ subprocess.run([compiler, '-target', 'arm64-apple-ios17.0', '-mkernel', '-c', st
 archive = OUT / 'libGopFramebuffer.late.a'
 archive.unlink(missing_ok=True)
 archiver = ['llvm-ar'] if shutil.which('llvm-ar') else ['xcrun', 'ar']
-subprocess.run([*archiver, 'rcs', str(archive), str(late), str(bindings_obj)], check=True, timeout=60)
+subprocess.run([*archiver, 'rcs', str(archive), *[str(p) for p in object_paths], str(bindings_obj)], check=True, timeout=60)
 
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 (OUT / 'build-report.json').write_text(json.dumps({
-    'source_sha256': {str(SOURCE.relative_to(ROOT)): sha(SOURCE)},
+    'source_sha256': {str(s.relative_to(ROOT)): sha(s) for s in SOURCES},
     'bindings_sha256': sha(BINDINGS),
-    'compiled_object_sha256': sha(obj),
-    'late_object_sha256': sha(late),
     'archive_sha256': sha(archive),
     'hardware_execution': False,
 }, indent=2) + '\n')

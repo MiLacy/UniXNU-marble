@@ -30,6 +30,14 @@
             no-map;
         };
     };
+
+    // Display-subsystem node: userspace counts these under /arm-io and waits
+    // for one IOMobileFramebuffer service (CPU presenter in this port).
+    display-subsystem {
+        unixnu,adt-name = "disp0";
+        device_type = "display-subsystem";
+        compatible = "marble,display";
+    };
 };
 
 // SM7475 has four Cortex-A510 cores and four performance cores. XNU's Edge

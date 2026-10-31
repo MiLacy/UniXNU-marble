@@ -6,3 +6,4 @@ marble-exec-panic-evidence.patch
 marble-md0-blocksize.patch
 marble-md0-force4096.patch
 marble-root-unverified.patch
+native-display-personality.patch

@@ -1,10 +1,4 @@
 # SPDX-License-Identifier: MIT
-.globl __ZN19IOMobileFramebuffer10gMetaClassE
-.set __ZN19IOMobileFramebuffer10gMetaClassE, 0xfffffff006b313d8
-.globl __ZN19IOMobileFramebufferC2EPK11OSMetaClass
-.set __ZN19IOMobileFramebufferC2EPK11OSMetaClass, 0xfffffff00577b318
-.globl __ZN19IOMobileFramebufferD2Ev
-.set __ZN19IOMobileFramebufferD2Ev, 0xfffffff00577b364
 .text
 .p2align 2
 .globl _native_mobile_display_provider_probe
