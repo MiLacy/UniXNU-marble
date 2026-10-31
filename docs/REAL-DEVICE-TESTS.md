@@ -258,6 +258,24 @@ The earlier read-only probe recorded the partition as Android ext4 with no
 `SHNGROOT` manifest. A successful tail write makes the manifest visible at
 LBA `59589627` while the ext4 superblock at LBA `3107328` stays intact.
 
+### First unverified root result
+
+The first tail-root boot mounted the OS root and reached `load_init_program`,
+then failed because the SystemOS cryptex was not mounted:
+
+```text
+initproc failed to start -- exit reason namespace 6 subcode 0x1
+description: Library not loaded: /usr/lib/libSystem.B.dylib
+Reason: tried: '/usr/lib/libSystem.B.dylib' (no such file, no dyld cache)
+```
+
+The root kernel at that point had `CONFIG_XNU_OWNER_CACHE_MOUNT=n` and
+`CONFIG_XNU_OWNER_UNION_SYSTEMOS=n`. The next image enables both and resolves
+the SystemOS APFS UUID through the development-only
+`package/MarbleUnverifiedRoot.cpp` lookup. This is still unverified and still
+has no Data seed; the expected next result is launchd or a `/private/var`
+failure.
+
 ## Stage 3 — System entry (owner-verified tail root)
 
 **请使用 marble 实机测试：不刷入任何分区，直接 `fastboot boot` 本次镜像，确认

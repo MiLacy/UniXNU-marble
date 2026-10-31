@@ -76,13 +76,16 @@ partition is left alone; the image is written with
 
 | Artifact | Size | SHA-256 |
 | --- | --- | --- |
-| `boot.img` | 169,607,168 | `b233202c997839648756d005a9d6063a401106d19fd9a7fbb62f826169ba1407` |
-| `payload.img` | 167,772,160 | `992815d556aa6bf51104bf17c3cf8d010eac478ef4dba8ca95ec0f27440002f6` |
-| root `kernel.macho` | 51,146,752 | `ac94dde29edd3f491a71f7339e0a1d1b947e97bc2b574c372742f3d8ede7910c` |
+| `boot.img` | 169,607,168 | `6ac2fc9ea3e0f9930d8d9170a716bf2ad8cda062c8687437460a4ef40365d9aa` |
+| `payload.img` | 167,772,160 | `ce0e033212ce719f2c42aa0f1b859c9932b77e11b60fcc4bdb3723e1ff06db1f` |
+| root `kernel.macho` | 51,146,752 | `b1ae430bf1105e433f780ae88c762ddfcb2ab39d96963da4a98ae174f6105918` |
 | `userdata-root.img` | 9,382,658,048 | `fd43ee7035ce185ce4215ac93fdc006fd784a54b3b7442e21457c226cbe03093` |
 
 The root is **unverified**: the payload passes `native-ufs-allow-unverified=1`
-and `root-unverified=1`. There is no Data seed, so `/private/var` may still
+and `root-unverified=1`. This build also enables the read-only SystemOS union
+through a development-only UUID lookup, so `libSystem.B.dylib` can come from
+the SystemOS volume. The lookup bypasses the owner signature and must not be
+used for a verified image. There is no Data seed, so `/private/var` may still
 block launchd. The image is in
 `out/marble/ipados-17.7.11-21H461/marble-root/userdata/`.
 
