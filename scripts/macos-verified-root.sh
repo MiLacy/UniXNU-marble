@@ -28,8 +28,10 @@ cd "$UNIXNU"
 
 echo "== fetch OS and SystemOS members"
 ./unixnu ipsw fetch -D "$DEVICE" OS Cryptex1,SystemOS
-cp -f "$UNIXNU/out/ipsw/21H461/044-76040-038.dmg" "$OS_DMG"
-cp -f "$UNIXNU/out/ipsw/21H461/044-76034-038.dmg" "$SYSTEMOS_DMG"
+# Symlink instead of copying: the macOS runner has a small disk and the
+# policy builder can attach the extracted DMG in out/ipsw directly.
+ln -sf "$UNIXNU/out/ipsw/21H461/044-76040-038.dmg" "$OS_DMG"
+ln -sf "$UNIXNU/out/ipsw/21H461/044-76034-038.dmg" "$SYSTEMOS_DMG"
 
 echo "== build owner host verifier and keys"
 python3 "$UNIXNU/kits/VerifiedRoot/tests/check.py" \

@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: UniXNU/UniXNU
-          ref: f0721e9745c45ad2600cd69c74730f1cca55d56a
+          ref: 04b4e558bcded5213c2d802984862dc062f28257
           path: unixnu
           submodules: recursive
 
@@ -36,3 +36,4 @@ jobs:
           name: verified-root-data
           path: device/artifacts/verified-root-data
           if-no-files-found: error
+          retention-days: 1
