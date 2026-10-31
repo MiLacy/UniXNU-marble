@@ -32,7 +32,11 @@ if not SOURCE.is_file():
 object_path = directory / 'native-storage-original-bindings.o'
 subprocess.run(['xcrun', '--sdk', 'iphoneos', 'clang', '-arch', 'arm64', '-mkernel',
                 '-miphoneos-version-min=17.0', '-c', str(SOURCE), '-o', str(object_path)], check=True)
-subprocess.run(['xcrun', 'ar', 'rcs', str(archive), str(object_path)], check=True)
+# A subset archive is linked with a component that already carries the
+# original IOBlockStorageDevice bindings (for marble, ShengUfs). Adding the
+# shared object to both archives makes ld64 reject 19 duplicate symbols.
+if not args.subset:
+    subprocess.run(['xcrun', 'ar', 'rcs', str(archive), str(object_path)], check=True)
 
 original = set(re.findall(r'^\.set\s+(\S+)\s*,', SOURCE.read_text(), re.M))
 component_object = directory / (args.component + '.o')
