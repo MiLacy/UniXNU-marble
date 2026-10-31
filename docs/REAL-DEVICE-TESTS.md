@@ -147,6 +147,18 @@ full-root `boot.img` (`ce8b5f6e...`) and the trust bundle were produced by the
 previous workspace and are not part of this checkout. Rebuild them from the
 external inputs before running the storage stage.
 
+**Observed on marble, 2026-11-01:**
+
+```text
+Failed to mount root device @IOKitBSDInit.cpp:984
+frames fffffff007982f84 fffffff0076eb1d4 fffffff0072c9c18 fffffff00741c4a4
+```
+
+The frames are `IOFindBSDRoot+0xc88`, `bsd_init+0x6e8`,
+`kernel_bootstrap_thread+0x4f4` and `Call_continuation+0x44`. This is the
+correct Stage 2 stop for the console configuration: XNU entered IOKit, ran
+BSD init and found no root device because UFS is not selected.
+
 Expected:
 
 - `UNIXNU:` reports the payload path and the `xnu` entry.
@@ -180,15 +192,14 @@ Common failures:
 | no display | use the framebuffer console; the legacy display stack is a later stage |
 
 The Stage 2 image did not enable `native-ufs-root=1` or the display stack,
-so the kernel reached the platform expert without touching UFS or the panel.
-The current defconfig enables the full UFS root; Stage 2 above records the
-historical first-console result.
+so the kernel reached BSD init without touching UFS or the panel. The current
+default `marble_defconfig` is the full UFS-root configuration; Stage 2 above
+records the console configuration.
 
 Expected stop for the Stage 2 image: with the PMGR placeholder enabled, AMFI
-and IOKit should pass; the kernel then has no root device. It waits for a root
-and panics (or prints the root-device timeout). That was the correct result
-for that image: Stage 2 proves kernel entry, platform setup and IOKit, not
-userland. Stage 3 below is the root stage.
+and IOKit pass; the kernel then has no root device and prints
+`Failed to mount root device`. That is the correct result for that image:
+Stage 2 proves kernel entry, platform setup, IOKit and BSD init, not userland. Stage 3 below is the root stage.
 
 ---
 

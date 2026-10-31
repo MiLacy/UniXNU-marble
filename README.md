@@ -6,15 +6,15 @@ UniXNU port for the **Redmi Note 12 Turbo / POCO F5 (`marble`)**, Qualcomm
 
 This repository is a Format-2 device port. It supplies the board device tree,
 component selection, UEFI firmware inputs, kernel configuration and the
-real-device test procedure. It is not a claim of a completed hardware boot:
-every stage below must be verified on a physical marble.
+real-device test procedure. Stage 2 (XNU entry) is device-verified; the UFS
+root and the userland stages remain open.
 
 ## Status
 
 | Stage | State | What runs |
 | --- | --- | --- |
 | 1. UEFI / UniXNU menu | verified on marble | `UniXNU.efi`, `UniXNUDxe`, `UniXNURamDiskDxe` and `DarwinBoot` are in the 3 MiB marble firmware volume |
-| 2. XNU kernel entry | host-built console image; previous hardware result | XNU 10063.141.1 console kernel with the SM7475 patches; payload carries the kernel, ADT and the two original trust caches |
+| 2. XNU kernel entry | **device-verified 2026-11-01** | XNU 10063.141.1 console kernel with the SM7475 patches; it reaches `IOKitBSDInit.cpp:984` and stops at the expected missing root device |
 | 3. System entry | built on host, awaiting device test | full UFS root build: the UFS controller, SMMU takeover and `NativeUfsBlock` are linked against the original `IOBlockStorageDevice` ABI, and an 8.8 GiB `OS`/`SystemOS` userdata image is written. The root is **unverified**: no verified-root bundle and no Data seed. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
 
 **Please test on a real marble at every stage.** The exact prompts, commands
