@@ -276,6 +276,25 @@ the SystemOS APFS UUID through the development-only
 has no Data seed; the expected next result is launchd or a `/private/var`
 failure.
 
+### Second unverified root result
+
+With the SystemOS union enabled, the same tail image mounted the OS root,
+resolved `/usr/lib/libSystem.B.dylib`, started launchd and spawned the original
+`sbin/mount -P 1` as PID 3. The child exited:
+
+```text
+mount[3] exited -- no exit reason available -- (signal 0, exit status 66)
+frames fffffff0079e7118 fffffff0077265a0 fffffff007725ad4 fffffff007725904
+       fffffff00788dff4 fffffff00741ff88 fffffff00741f5d8 fffffff00741f5a0
+```
+
+The frames are the normal `proc_exit` / `exit` / `unix_syscall` path. This is
+the known missing **boot-manifest-hash** checkpoint, not a Data-volume failure:
+the unverified build has `CONFIG_XNU_OWNER_BOOT_MANIFEST=n` and no verified-root
+policy. Enabling `XNU_OWNER_BOOT_MANIFEST` needs the owner-signed manifest and
+`native_verified_block_manifest_sha384`; the next step is the macOS
+verified-root bundle, not a data-only change.
+
 ## Stage 3 — System entry (owner-verified tail root)
 
 **请使用 marble 实机测试：不刷入任何分区，直接 `fastboot boot` 本次镜像，确认

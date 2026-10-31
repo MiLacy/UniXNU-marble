@@ -15,7 +15,7 @@ root and the userland stages remain open.
 | --- | --- | --- |
 | 1. UEFI / UniXNU menu | verified on marble | `UniXNU.efi`, `UniXNUDxe`, `UniXNURamDiskDxe` and `DarwinBoot` are in the 3 MiB marble firmware volume |
 | 2. XNU kernel entry | **device-verified 2026-11-01** | XNU 10063.141.1 console kernel with the SM7475 patches; it reaches `IOKitBSDInit.cpp:984` and stops at the expected missing root device |
-| 3. System entry | tail-root image built; device write pending | unverified UFS root: `NativeUfsBlock` reads OS/SystemOS from LBA `59589627..61880314`; the 8.7 GiB image is written to the userdata tail without touching Android ext4 data. No verified-root bundle or Data seed. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
+| 3. System entry | **device-verified root + launchd; boot manifest pending** | unverified UFS root: `NativeUfsBlock` reads OS/SystemOS from LBA `59589627..61880314`; the SystemOS union supplies `libSystem` and launchd starts. launchd then spawns `/sbin/mount` (PID 3), which exits 66 because no boot-manifest-hash is published. No verified-root bundle or Data seed. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
 
 **Please test on a real marble at every stage.** The exact prompts, commands
 and observations to capture are in [REAL-DEVICE-TESTS.md](docs/REAL-DEVICE-TESTS.md).
@@ -85,8 +85,18 @@ The root is **unverified**: the payload passes `native-ufs-allow-unverified=1`
 and `root-unverified=1`. This build also enables the read-only SystemOS union
 through a development-only UUID lookup, so `libSystem.B.dylib` can come from
 the SystemOS volume. The lookup bypasses the owner signature and must not be
-used for a verified image. There is no Data seed, so `/private/var` may still
-block launchd. The image is in
+used for a verified image. There is no Data seed.
+
+On marble this image mounted the OS root, resolved `libSystem`, started
+launchd and spawned `/sbin/mount -P 1` as PID 3. That child exited 66:
+
+```text
+mount[3] exited -- no exit reason available -- (signal 0, exit status 66)
+```
+
+This is the known **missing `boot-manifest-hash`** checkpoint, not a Data
+failure: `CONFIG_XNU_OWNER_BOOT_MANIFEST` is off and no verified-root policy is
+present. The image is in
 `out/marble/ipados-17.7.11-21H461/marble-root/userdata/`.
 
 ## Hardware summary
