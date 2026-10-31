@@ -5,6 +5,11 @@
 #include "MarbleDisplayABI.h"
 #include <IOKit/IOLib.h>
 #include <pexpert/pexpert.h>
+#include <IOKit/IODeviceTreeSupport.h>
+#include <libkern/c++/OSSymbol.h>
+#include <libkern/c++/OSMetaClass.h>
+
+extern "C" void marble_marble_ctor(void) asm("__GLOBAL__sub_I_MarbleDisplay.cpp");
 extern "C" void boot_progress_stage(const char *message);
 
 extern "C" uint64_t marble_display_calls;
@@ -839,4 +844,63 @@ uint32_t marble_display_counts[262];
 extern "C" void
 native_mobile_display_provider_probe(void)
 {
+}
+
+// Called after the prelinked IOMobileGraphicsFamily is initialized: register
+// this subclass, then attach it to the disp0 nub directly (personality match
+// cannot succeed before the base meta class exists).
+extern "C" void
+marble_display_late_start(void)
+{
+	static int done = 0;
+	if (done) {
+		return;
+	}
+	done = 1;
+	marble_marble_ctor();
+	marble_display_init = 1;
+	const OSMetaClass *mc = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("MarbleDisplay"));
+	if (mc == nullptr) {
+		marble_display_started = 2;
+		return;
+	}
+	IORegistryEntry *entry = IORegistryEntry::fromPath("/arm-io/disp0", gIODTPlane);
+	if (entry == nullptr) {
+		marble_display_started = 3;
+		return;
+	}
+	IOService *nub = OSDynamicCast(IOService, entry);
+	if (nub == nullptr) {
+		entry->release();
+		marble_display_started = 4;
+		return;
+	}
+	IOService *service = OSDynamicCast(IOService, mc->alloc());
+	if (service == nullptr) {
+		entry->release();
+		marble_display_started = 5;
+		return;
+	}
+	if (!service->init()) {
+		service->release();
+		entry->release();
+		marble_display_started = 6;
+		return;
+	}
+	if (!service->attach(nub)) {
+		service->release();
+		entry->release();
+		marble_display_started = 7;
+		return;
+	}
+	if (!service->start(nub)) {
+		service->detach(nub);
+		service->release();
+		entry->release();
+		marble_display_started = 8;
+		return;
+	}
+	service->registerService();
+	marble_display_started = 1;
+	entry->release();
 }

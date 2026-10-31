@@ -13,6 +13,7 @@
 #include <pexpert/pexpert.h>
 
 extern proc_t initproc;
+extern void marble_display_late_start(void);
 
 static const char policy_head[] =
  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -161,6 +162,7 @@ done:
 			}
 		}
 	}
+	marble_display_late_start ();
 	printf ("sheng bring-up launch policy: %d (%s)\n", error, error ? "not applied" : "disabled.plist written");
 	sheng_launch_policy_status = error;
 	/* The policy is advisory: never stop the boot for it. */

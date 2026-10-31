@@ -53,7 +53,41 @@ for source in SOURCES:
         index += 1
     command += ['-Wno-error', '-I', str(SOURCES[0].parent)]
     subprocess.run(command, cwd=record['directory'], check=True, timeout=180)
-    object_paths.append(obj)
+    late = OUT / (source.stem + '.late.o')
+    import struct as _struct
+    data = bytearray(obj.read_bytes())
+    magic, _, _, _, ncmds = _struct.unpack_from('<IiiII', data, 0)
+    if magic != 0xFEEDFACF:
+        raise SystemExit('display object is not a 64-bit Mach-O')
+    off = 32
+    symtab = None
+    for _ in range(ncmds):
+        cmd, size = _struct.unpack_from('<II', data, off)
+        if cmd == 0x19:
+            sect = off + 72
+            nsects = _struct.unpack_from('<I', data, off + 64)[0]
+            for _ in range(nsects):
+                sectname = bytes(data[sect:sect + 16]).split(b'\0')[0]
+                if sectname == b'__mod_init_func':
+                    _struct.pack_into('<Q', data, sect + 40, 0)   # size
+                    _struct.pack_into('<I', data, sect + 48, 0)   # offset
+                    _struct.pack_into('<I', data, sect + 56, 0)   # reloff
+                    _struct.pack_into('<I', data, sect + 60, 0)   # nreloc
+                sect += 80
+        elif cmd == 0x2:
+            symtab = _struct.unpack_from('<IIII', data, off + 8)
+        off += size
+    if symtab is None:
+        raise SystemExit('display object has no symbol table')
+    symoff, nsyms, stroff, strsize = symtab
+    for i in range(nsyms):
+        at = symoff + i * 16
+        strx, ntype, nsect, ndesc, value = _struct.unpack_from('<IBBHQ', data, at)
+        name = bytes(data[stroff + strx:stroff + strsize]).split(b'\0')[0]
+        if name == b'__GLOBAL__sub_I_MarbleDisplay.cpp':
+            _struct.pack_into('<B', data, at + 4, ntype | 0x01)
+    late.write_bytes(data)
+    object_paths.append(late)
 
 compiler = shutil.which('clang') or '/opt/unixnu-linux/llvm/bin/clang'
 bindings_obj = OUT / 'gop-framebuffer-bindings.o'
