@@ -38,6 +38,9 @@ static volatile int mBeat;
 
 extern volatile uint64_t native_ufs_block_reads;
 extern uint64_t sweet_fb_swap_count;
+extern uint64_t sweet_fb_started;
+extern volatile int sheng_launch_policy_status;
+static unsigned mStatusY;
 extern volatile uint64_t native_ufs_verified_blocks;
 
 static int
@@ -287,7 +290,11 @@ bp_header (void)
 	bp_emit ('/');
 	bp_number (native_ufs_block_reads, 10);
 	bp_text (" FB ");
+	bp_number (sweet_fb_started, 10);
+	bp_emit ('/');
 	bp_number (sweet_fb_swap_count, 10);
+	bp_text (" POL ");
+	bp_number ((uint64_t)(unsigned)(sheng_launch_policy_status < 0 ? 9 : sheng_launch_policy_status), 10);
 	bp_emit ('\n');
 	mX = saved_x;
 	mY = saved_y;
@@ -332,6 +339,7 @@ boot_progress_bind (uintptr_t base, unsigned width, unsigned height, unsigned ro
 	mRowBytes = rowbytes;
 	mCols = width / BP_CELL;
 	mBarY = mHeight * 12 / 100;
+	mStatusY = mBarY + 92;
 	mHeaderY = mHeight * 20 / 100;
 	mLogY = mHeaderY + BP_LINE;
 	mX = 0;
@@ -341,6 +349,7 @@ boot_progress_bind (uintptr_t base, unsigned width, unsigned height, unsigned ro
 		bp_fill (0, 0, mWidth, mHeight, 0xFF000000u);
 		bp_splash ();
 		bp_header ();
+		bp_text_at (0, mStatusY, BP_SCALE, "EXEC -", 0xFFFFFFFFu);
 		bp_text ("MARBLE XNU BOOT\n");
 		bp_unlock ();
 	}
@@ -403,6 +412,20 @@ boot_progress_process_stage (int pid, const char *name, const char *stage)
 		return;
 	}
 	lines++;
+	{
+		unsigned saved_x = mX, saved_y = mY;
+		bp_fill (0, mStatusY, mWidth, BP_LINE, 0xFF000000u);
+		mX = 0;
+		mY = mStatusY;
+		bp_text ("EXEC ");
+		bp_text (name ? name : "?");
+		bp_emit ('[');
+		bp_number ((uint64_t)(unsigned)pid, 10);
+		bp_text ("] ");
+		bp_text (stage ? stage : "?");
+		mX = saved_x;
+		mY = saved_y;
+	}
 	bp_text (name ? name : "?");
 	bp_emit ('[');
 	bp_number ((uint64_t)(unsigned)pid, 10);

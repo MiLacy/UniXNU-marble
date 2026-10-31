@@ -44,6 +44,8 @@
 #include <kern/clock.h>
 #include <sys/proc.h>
 extern "C" void boot_progress_stage(const char *message);
+uint64_t sweet_fb_swap_count;
+uint64_t sweet_fb_started;
 
 enum {
 	kSweetFBGetLayerDefaultSurface  = 3,
@@ -176,6 +178,7 @@ AppleCLCD::start(IOService *provider)
 		provider->setProperty("canvas-height", fHeight, 32);
 	}
 	registerService();
+	sweet_fb_started = 1;
 	boot_progress_stage("sweetfb start OK");
 	IOLog("SWEET FB: AppleCLCD %ux%u stride %u at 0x%llx, default surface %u\n",
 	    fWidth, fHeight, fRowBytes, fPhys, fSurface->id);
@@ -242,7 +245,6 @@ get32(const uint8_t *p, uint32_t off)
 }
 
 static uint32_t sweet_fb_swaps_logged;
-uint64_t sweet_fb_swap_count;
 
 /* Record the latest swap; the vsync timer presents it at most sweetfb_hz times per second. */
 void
