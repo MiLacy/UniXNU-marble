@@ -17,6 +17,11 @@ spelling; without this, `interrupt-parent` resolves to NULL and
 The resulting driver still requires `native-ufs-allow-unverified=1` and
 `root-unverified=1`; it is only for the first tail-root bring-up.
 
+`0006-unverified-boot-progress.patch` allows
+`XNU_BOOT_PROGRESS_UNVERIFIED=1` to build the framebuffer console before the
+audited UFS/owner-root chain exists. It only bypasses the build guard; the
+logger itself is `package/BootProgress.c`.
+
 `0005-no-panic-screen.patch` adds `build payload --no-panic-screen`. It keeps
 the verbose XNU console visible instead of patching in the panic screen, so a
 photograph shows the boot log around a failure. The kernel and payload are
@@ -36,6 +41,7 @@ git apply ../UniXNU-marble/patches/unixnu/0002-adt-aapl-phandle.patch
 git apply ../UniXNU-marble/patches/unixnu/0003-unverified-native-ufs.patch
 git apply ../UniXNU-marble/patches/unixnu/0004-unverified-systemos-mount.patch
 git apply ../UniXNU-marble/patches/unixnu/0005-no-panic-screen.patch
+git apply ../UniXNU-marble/patches/unixnu/0006-unverified-boot-progress.patch
 ```
 
 The patch was tested against the UniXNU checkout used for the 2026-11-01

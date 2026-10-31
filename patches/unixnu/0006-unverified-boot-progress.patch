@@ -1,0 +1,16 @@
+diff --git a/scripts/build-xnu-4k-baseline.sh b/scripts/build-xnu-4k-baseline.sh
+index 2d9cc87..95cf712 100755
+--- a/scripts/build-xnu-4k-baseline.sh
++++ b/scripts/build-xnu-4k-baseline.sh
+@@ -77,8 +77,9 @@ if [ "$BOOT_PROGRESS" != 0 ] && [ "$BOOT_PROGRESS" != 1 ]; then
+   exit 1
+ fi
+ if [ "$BOOT_PROGRESS" = 1 ]; then
+-  if [ "${XNU_NATIVE_UFS:-0}" != 1 ] || [ "${XNU_OWNER_ROOT_AUDIT:-0}" != 1 ] || \
+-     [ "${XNU_NATIVE_VIRTIO_BLOCK:-0}" != 1 ] || [ "${XNU_SOURCE_CORECRYPTO14:-0}" != 1 ]; then
++  if { [ "${XNU_NATIVE_UFS:-0}" != 1 ] || [ "${XNU_OWNER_ROOT_AUDIT:-0}" != 1 ] || \
++       [ "${XNU_NATIVE_VIRTIO_BLOCK:-0}" != 1 ] || [ "${XNU_SOURCE_CORECRYPTO14:-0}" != 1 ]; } && \
++     [ "${XNU_BOOT_PROGRESS_UNVERIFIED:-0}" != 1 ]; then
+     echo 'Boot progress requires the audited UFS/owner-root, Virtio and source-corecrypto build' >&2
+     exit 1
+   fi

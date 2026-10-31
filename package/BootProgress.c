@@ -63,6 +63,11 @@ extern unsigned int processor_count;
 extern volatile int sheng_launch_policy_status;
 static unsigned mStatusY;
 extern volatile uint64_t native_ufs_verified_blocks;
+/* Unverified/display-less bring-up: keep the screen logger linkable without
+ * the verified UFS counter or the GOP display provider. Strong definitions
+ * from those archives replace these weak ones when selected. */
+__attribute__((weak)) volatile uint64_t native_ufs_verified_blocks;
+__attribute__((weak)) void marble_display_late_start(void) {}
 
 static int
 bp_lock (void)
