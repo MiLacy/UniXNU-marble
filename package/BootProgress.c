@@ -58,7 +58,7 @@ bp_fill (unsigned x, unsigned y, unsigned w, unsigned h, uint32_t color)
 		return;
 	}
 	for (unsigned row = 0; row < h && y + row < mHeight; row++) {
-		uint32_t *line = (uint32_t *)(mBase + (size_t)(y + row) * mRowBytes);
+		volatile uint32_t *line = (volatile uint32_t *)(mBase + (size_t)(y + row) * mRowBytes);
 		for (unsigned col = 0; col < w && x + col < mWidth; col++) {
 			line[x + col] = color;
 		}
@@ -78,7 +78,7 @@ bp_glyph_s (unsigned x, unsigned y, char c, uint32_t fg, uint32_t bg, unsigned s
 	top = (unsigned)(glyph >> 32);
 	bottom = (unsigned)glyph;
 	for (unsigned row = 0; row < 14 * scale; row++) {
-		uint32_t *line = (uint32_t *)(mBase + (size_t)(y + row) * mRowBytes);
+		volatile uint32_t *line = (volatile uint32_t *)(mBase + (size_t)(y + row) * mRowBytes);
 		for (unsigned col = 0; col < 6 * scale; col++) {
 			if (x + col < mWidth) {
 				line[x + col] = bg;
@@ -93,7 +93,7 @@ bp_glyph_s (unsigned x, unsigned y, char c, uint32_t fg, uint32_t bg, unsigned s
 					if (y + row * scale + dy >= mHeight) {
 						continue;
 					}
-					uint32_t *line = (uint32_t *)(mBase + (size_t)(y + row * scale + dy) * mRowBytes);
+					volatile uint32_t *line = (volatile uint32_t *)(mBase + (size_t)(y + row * scale + dy) * mRowBytes);
 					for (unsigned dx = 0; dx < scale; dx++) {
 						if (x + col * scale + dx < mWidth) {
 							line[x + col * scale + dx] = fg;
@@ -169,9 +169,13 @@ bp_emit (char c)
 		return;
 	}
 	if (mY + BP_LINE > mHeight) {
-		size_t bytes = (size_t)(mHeight - mLogY - BP_LINE) * mRowBytes;
-		memmove ((void *)mBase + mLogY * mRowBytes,
-		    (const void *)mBase + (mLogY + BP_LINE) * mRowBytes, bytes);
+		for (unsigned row = 0; row < mHeight - mLogY - BP_LINE; row++) {
+			volatile uint32_t *dst = (volatile uint32_t *)(mBase + (size_t)(mLogY + row) * mRowBytes);
+			volatile uint32_t *src = (volatile uint32_t *)(mBase + (size_t)(mLogY + BP_LINE + row) * mRowBytes);
+			for (unsigned col = 0; col < mWidth; col++) {
+				dst[col] = src[col];
+			}
+		}
 		bp_fill (0, mHeight - BP_LINE, mWidth, BP_LINE, 0xFF000000u);
 		mY = mHeight - BP_LINE;
 	}
