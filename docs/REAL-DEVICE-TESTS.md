@@ -218,12 +218,12 @@ Do not run `flash`, `erase`, `format`, `set_active` or `oem` commands.
 
 Inputs:
 
-- `boot.img` 168,960,000 bytes, SHA-256
-  `2a0754ab9dd6885a4862a435a81b725a79dee26e9526831c527e5f2042710ea4`;
+- `boot.img` 169,611,264 bytes, SHA-256
+  `1e8c00a5a58f76cb80402be327ab51e81da1a75dc9485ea7be9319e33f17c225`;
 - owner kernel `kernel.macho` SHA-256
   `6b18e7e92120c47b75abbe626e639b80d39dcf63457ef8849de6bbee7ad590db`;
 - `payload.img` 160 MiB, SHA-256
-  `92e1a330adb1555972fd16617d1972948fd868a9f9c9b5f73e93b5d7cc157e05`,
+  `5e9dab932898010f6762beb95c40aa48960d0a3bdbedde1b7c4b4de19f28dca8`,
   payload kernel SHA-256
   `9db2922e7ff9ffea1d7f418a3b87c38d9220080ad152e0fa8a2c6f3c0b7b29a3`;
 - Data seed `data-3g.dbr` SHA-256
