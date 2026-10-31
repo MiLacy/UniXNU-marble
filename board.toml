@@ -49,6 +49,7 @@ archives = [
   "build-mockfs-fixture.py",
   "build-libpthread-kernel.py",
   "build-platform-power.py",
+  "build-marble-unverified-root.py",
   "build-gop-framebuffer.py",
 ]
 

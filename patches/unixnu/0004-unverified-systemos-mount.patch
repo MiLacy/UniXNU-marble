@@ -1,0 +1,13 @@
+diff --git a/scripts/build-xnu-4k-baseline.sh b/scripts/build-xnu-4k-baseline.sh
+index a036489..2d9cc87 100755
+--- a/scripts/build-xnu-4k-baseline.sh
++++ b/scripts/build-xnu-4k-baseline.sh
+@@ -376,7 +376,7 @@ if [ "$OWNER_CACHE_MOUNT" != 0 ] && [ "$OWNER_CACHE_MOUNT" != 1 ]; then
+   echo 'XNU_OWNER_CACHE_MOUNT must be 0 or 1' >&2
+   exit 1
+ fi
+-if [ "$OWNER_CACHE_MOUNT" = 1 ] && [ "$OWNER_ROOT_TRUST" != 1 ]; then
++if [ "$OWNER_CACHE_MOUNT" = 1 ] && [ "$OWNER_ROOT_TRUST" != 1 ] && [ "${XNU_OWNER_CACHE_UNVERIFIED:-0}" != 1 ]; then
+   echo 'The offline SystemOS mount requires real independent owner root enforcement' >&2
+   exit 1
+ fi

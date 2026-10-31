@@ -17,11 +17,19 @@ spelling; without this, `interrupt-parent` resolves to NULL and
 The resulting driver still requires `native-ufs-allow-unverified=1` and
 `root-unverified=1`; it is only for the first tail-root bring-up.
 
+`0004-unverified-systemos-mount.patch` allows
+`XNU_OWNER_CACHE_UNVERIFIED=1` to bypass the fail-closed build guard for the
+offline SystemOS mount. It must be paired with
+`package/MarbleUnverifiedRoot.cpp`, which resolves the SystemOS APFS UUID
+without authentication. This is a development-only path and must not be used
+for a verified-root image.
+
 ```sh
 cd ../UniXNU
 git apply ../UniXNU-marble/patches/unixnu/0001-bootimg-existing-dtb-node.patch
 git apply ../UniXNU-marble/patches/unixnu/0002-adt-aapl-phandle.patch
 git apply ../UniXNU-marble/patches/unixnu/0003-unverified-native-ufs.patch
+git apply ../UniXNU-marble/patches/unixnu/0004-unverified-systemos-mount.patch
 ```
 
 The patch was tested against the UniXNU checkout used for the 2026-11-01
