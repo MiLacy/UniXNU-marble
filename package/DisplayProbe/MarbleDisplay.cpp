@@ -19,6 +19,8 @@ extern "C" uint64_t marble_display_init;
 extern "C" uint64_t marble_display_base;
 extern "C" uint64_t marble_display_self;
 extern "C" uint64_t marble_display_kext;
+extern "C" uint64_t marble_display_iosvc;
+extern "C" uint64_t marble_display_kloaded;
 extern "C" uint32_t marble_display_last;
 extern "C" uint32_t marble_display_counts[262];
 
@@ -834,22 +836,18 @@ MarbleDisplay::unclassified261()
 	return kIOReturnUnsupported;
 }
 
-extern "C" uint64_t marble_display_calls;
-extern "C" uint64_t marble_display_started;
-extern "C" uint64_t marble_display_init;
-extern "C" uint64_t marble_display_base;
-extern "C" uint64_t marble_display_self;
-extern "C" uint64_t marble_display_kext;
-extern "C" uint32_t marble_display_last;
-extern "C" uint32_t marble_display_counts[262];
+extern "C" {
 uint64_t marble_display_calls;
 uint64_t marble_display_started;
 uint64_t marble_display_init;
 uint64_t marble_display_base;
 uint64_t marble_display_self;
 uint64_t marble_display_kext;
+uint64_t marble_display_iosvc;
+uint64_t marble_display_kloaded;
 uint32_t marble_display_last;
 uint32_t marble_display_counts[262];
+}
 
 extern "C" void
 native_mobile_display_provider_probe(void)
@@ -867,7 +865,9 @@ marble_display_late_start(void)
 		kext_tried = 1;
 		OSReturn loaded = OSKext::loadKextWithIdentifier("com.apple.iokit.IOMobileGraphicsFamily", false);
 		marble_display_kext = (loaded == kOSReturnSuccess) ? 1 : (uint64_t)(0x100 | (loaded & 0xff));
+		marble_display_kloaded = OSKext::isKextWithIdentifierLoaded("com.apple.iokit.IOMobileGraphicsFamily") ? 1 : 0;
 	}
+	marble_display_iosvc = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("IOService")) ? 1 : 0;
 	const OSMetaClass *base = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("IOMobileFramebuffer"));
 	marble_display_base = base ? 1 : 0;
 	if (!attempted) {

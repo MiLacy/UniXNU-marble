@@ -50,6 +50,8 @@ __attribute__((weak)) uint64_t marble_display_init;
 __attribute__((weak)) uint64_t marble_display_base;
 __attribute__((weak)) uint64_t marble_display_self;
 __attribute__((weak)) uint64_t marble_display_kext;
+__attribute__((weak)) uint64_t marble_display_iosvc;
+__attribute__((weak)) uint64_t marble_display_kloaded;
 extern void marble_display_late_start(void);
 static uint64_t mDisplayRetry;
 extern volatile uint32_t armcpu_smp_fail[8];
@@ -314,6 +316,17 @@ bp_beat (void)
 			do { digits[n++] = (char)('0' + v % 10); v /= 10; } while (v && n < sizeof (digits));
 			while (n) { bp_glyph_s (col * cell, y + 3 * line, digits[--n], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
 		}
+		col += 1;
+		const char *head7 = "io=";
+		for (const char *c = head7; *c; c++, col++) {
+			bp_glyph_s (col * cell, y + 3 * line, *c, 0xFFFFFFFFu, 0xFF000000u, scale);
+		}
+		bp_glyph_s (col * cell, y + 3 * line, marble_display_iosvc ? '1' : '0', 0xFFFFFFFFu, 0xFF000000u, scale); col += 4;
+		const char *head8 = "ld=";
+		for (const char *c = head8; *c; c++, col++) {
+			bp_glyph_s (col * cell, y + 3 * line, *c, 0xFFFFFFFFu, 0xFF000000u, scale);
+		}
+		bp_glyph_s (col * cell, y + 3 * line, marble_display_kloaded ? '1' : '0', 0xFFFFFFFFu, 0xFF000000u, scale);
 	}
 	bp_unlock ();
 }
