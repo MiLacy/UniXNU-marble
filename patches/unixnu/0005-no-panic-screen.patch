@@ -1,0 +1,30 @@
+diff --git a/scripts/unixnu/cli.py b/scripts/unixnu/cli.py
+index f400142..d6e90aa 100644
+--- a/scripts/unixnu/cli.py
++++ b/scripts/unixnu/cli.py
+@@ -37,6 +37,7 @@ def common():
+     p.add_argument('--unique-chip-id', metavar='HEX', help='platform seed for the device tree; or UNIXNU_UNIQUE_CHIP_ID')
+     p.add_argument('--ipsw', metavar='PATH_OR_URL', help='the target IPSW: a local file or an https URL (default: url of board.toml [ipsw]); or UNIXNU_IPSW')
+     p.add_argument('--dry-run', action='store_true', help='userdata: check sizes and pins, write nothing')
++    p.add_argument('--no-panic-screen', action='store_true', help='payload: keep the verbose kernel console instead of patching the panic screen')
+     p.add_argument('--target', choices=('DEBUG', 'RELEASE'), help='EDK II build target')
+     return p
+ 
+diff --git a/scripts/unixnu/payload.py b/scripts/unixnu/payload.py
+index 1bb9ad0..270f2cf 100644
+--- a/scripts/unixnu/payload.py
++++ b/scripts/unixnu/payload.py
+@@ -128,10 +128,11 @@ def build(ctx, kernel=None):
+     payloads.mkdir(parents=True)
+     shutil.copyfile(kernel, payloads / 'kernel.macho')
+     # The entry probe (stage bars, optional reset) is wanted with either setting; the panic screen is only one part of it.
+-    if spec.get('panic_screen') or spec.get('entry_probe_reset_delay'):
++    panic_screen = bool(spec.get('panic_screen')) and not getattr(args, 'no_panic_screen', False)
++    if panic_screen or spec.get('entry_probe_reset_delay'):
+         probe = (['--reset-delay', str(int(spec['entry_probe_reset_delay']))]
+                  if spec.get('entry_probe_reset_delay') else ['--no-reset'])
+-        screen = ['--panic-screen'] if spec.get('panic_screen') else []
++        screen = ['--panic-screen'] if panic_screen else []
+         if spec.get('entry_probe_reset_delay') and spec.get('entry_probe_reset_after'):
+             # Stage 4 in place of stage 3: reset after the Nth call to SYMBOL in FUNCTION.
+             probe += ['--reset-after', spec['entry_probe_reset_after'], '--in', spec.get('entry_probe_reset_in', '_arm_init'),
