@@ -17,14 +17,15 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'build/gop-framebuffer'
 OUT.mkdir(parents=True, exist_ok=True)
 
-SOURCES = [ROOT / 'kits/marble/SweetDisplay/SweetSurface.cpp',
-           ROOT / 'kits/marble/SweetDisplay/SweetFramebuffer.cpp']
+SOURCE = ROOT / 'kits/marble/DisplayProbe/MarbleDisplay.cpp'
+SOURCES = [SOURCE]
 BINDINGS = ROOT / 'kits/marble/gop-framebuffer-bindings.S'
 
 BINDINGS.parent.mkdir(parents=True, exist_ok=True)
 BINDINGS.write_text('# SPDX-License-Identifier: MIT\n'
-    '.text\n.p2align 2\n.globl _native_mobile_display_provider_probe\n'
-    '_native_mobile_display_provider_probe:\n    ret\n')
+    '.globl __ZN19IOMobileFramebuffer10gMetaClassE\n.set __ZN19IOMobileFramebuffer10gMetaClassE, 0xfffffff006b313d8\n'
+    '.globl __ZN19IOMobileFramebufferC2EPK11OSMetaClass\n.set __ZN19IOMobileFramebufferC2EPK11OSMetaClass, 0xfffffff00577b318\n'
+    '.globl __ZN19IOMobileFramebufferD2Ev\n.set __ZN19IOMobileFramebufferD2Ev, 0xfffffff00577b364\n')
 
 record = json.loads((ROOT / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json').read_text().strip().rstrip(','))
 object_paths = []
@@ -50,7 +51,7 @@ for source in SOURCES:
         else:
             command.append(value)
         index += 1
-    command += ['-DSWEET=1', '-Wno-error', '-I', str(SOURCES[0].parent)]
+    command += ['-Wno-error', '-I', str(SOURCES[0].parent)]
     subprocess.run(command, cwd=record['directory'], check=True, timeout=180)
     object_paths.append(obj)
 

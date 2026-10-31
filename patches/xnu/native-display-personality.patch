@@ -1,20 +1,14 @@
 --- a/iokit/KernelConfigTables.cpp
 +++ b/iokit/KernelConfigTables.cpp
-@@ -105,4 +105,18 @@
+@@ -88,4 +88,12 @@
      "     'IOProbeScore'    = 500:32;"
      "   }"
  #endif
 +#if defined(XNU_NATIVE_MOBILE_DISPLAY) && XNU_NATIVE_MOBILE_DISPLAY
 +    "   ,{"
-+    "     'IOClass'         = AppleCLCD;"
++    "     'IOClass'         = MarbleDisplay;"
 +    "     'IOProviderClass' = IOPlatformDevice;"
 +    "     'IONameMatch'     = 'disp0';"
-+    "     'IOProbeScore'    = 1000:32;"
-+    "   }"
-+    "   ,{"
-+    "     'IOClass'         = IOCoreSurfaceRoot;"
-+    "     'IOProviderClass' = IOResources;"
-+    "     'IOMatchCategory' = IOCoreSurfaceRoot;"
 +    "     'IOProbeScore'    = 1000:32;"
 +    "   }"
 +#endif

@@ -42,6 +42,13 @@ __attribute__((weak)) uint64_t sweet_fb_started;
 __attribute__((weak)) uint64_t sweet_fb_clients;
 __attribute__((weak)) uint64_t sweet_surf_calls;
 __attribute__((weak)) uint32_t sweet_surf_last;
+__attribute__((weak)) uint64_t marble_display_calls;
+__attribute__((weak)) uint32_t marble_display_last;
+__attribute__((weak)) uint32_t marble_display_counts[262];
+extern volatile uint32_t armcpu_smp_step[8];
+extern volatile uint32_t armcpu_core_timer[8];
+extern uint32_t processor_avail_count;
+extern unsigned int processor_count;
 extern int sheng_crash_log_read (void);
 extern volatile int sheng_crash_log_ready;
 extern char sheng_crash_log_text[];
@@ -309,6 +316,10 @@ bp_header (void)
 	bp_number (sweet_surf_last, 10);
 	bp_text (" POL ");
 	bp_number ((uint64_t)(unsigned)(sheng_launch_policy_status < 0 ? 9 : sheng_launch_policy_status), 10);
+	bp_text (" CPU ");
+	bp_number ((uint64_t)(unsigned)(processor_avail_count > 0 ? processor_avail_count : 0), 10);
+	bp_emit ('/');
+	bp_number ((uint64_t)(unsigned)(processor_count > 0 ? processor_count : 0), 10);
 	bp_emit ('\n');
 	mX = saved_x;
 	mY = saved_y;
@@ -327,6 +338,30 @@ bp_beat (void)
 	mLastBeat = now;
 	mBeat++;
 	bp_header ();
+	{
+		unsigned scale = 2, cell = 6 * scale, line = 14 * scale, y = mHeight * 9 / 100;
+		bp_fill (0, y, mWidth, 2 * line, 0xFF000000u);
+		unsigned col = 0;
+		const char *head = "CORES step ";
+		for (const char *c = head; *c; c++, col++) {
+			bp_glyph_s (col * cell, y, *c, 0xFFFFFFFFu, 0xFF000000u, scale);
+		}
+		for (unsigned i = 0; i < 8; i++) {
+			char digits[8]; unsigned n = 0; uint64_t v = armcpu_smp_step[i];
+			do { digits[n++] = (char)('0' + v % 10); v /= 10; } while (v && n < sizeof (digits));
+			while (n) { bp_glyph_s (col * cell, y, digits[--n], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
+			bp_glyph_s (col * cell, y, i == 7 ? ' ' : ',', 0xFFFFFFFFu, 0xFF000000u, scale); col++;
+		}
+		col = 0;
+		const char *head2 = "TIMER ";
+		for (const char *c = head2; *c; c++, col++) {
+			bp_glyph_s (col * cell, y + line, *c, 0xFFFFFFFFu, 0xFF000000u, scale);
+		}
+		for (unsigned i = 0; i < 8; i++) {
+			char ch = armcpu_core_timer[i] ? '1' : '0';
+			bp_glyph_s (col * cell, y + line, ch, 0xFFFFFFFFu, 0xFF000000u, scale); col++;
+		}
+	}
 	if (mCrashStage == 1) {
 		uint64_t wait = (uint64_t)mBeatInterval * (2 + 2 * (uint64_t)0);
 		if (now - mCrashAt >= 2 * wait) {
@@ -336,6 +371,39 @@ bp_beat (void)
 				mCrashStage = 2;
 				strlcpy (sheng_crash_log_text, "no crash report found", 64);
 			}
+		}
+	}
+	if (mCrashStage == 0 && marble_display_calls) {
+		unsigned y = mHeight * 6 / 100;
+		unsigned scale = 2, cols = mWidth / (6 * scale), col = 0, shown = 0;
+		char buf[24];
+		bp_fill (0, y, mWidth, 14 * scale, 0xFF000000u);
+		const char *head = "DISPLAY calls ";
+		for (const char *c = head; *c; c++) {
+			bp_glyph_s (col * 6 * scale, y, *c, 0xFFFFFFFFu, 0xFF000000u, scale); col++;
+		}
+		char digits[24];
+		unsigned n = 0; uint64_t v = marble_display_calls;
+		do { digits[n++] = (char)('0' + v % 10); v /= 10; } while (v && n < sizeof (digits));
+		while (n) { bp_glyph_s (col * 6 * scale, y, digits[--n], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
+		const char *tail = " last ";
+		for (const char *c = tail; *c; c++) {
+			bp_glyph_s (col * 6 * scale, y, *c, 0xFFFFFFFFu, 0xFF000000u, scale); col++;
+		}
+		n = 0; v = marble_display_last;
+		do { digits[n++] = (char)('0' + v % 10); v /= 10; } while (v && n < sizeof (digits));
+		while (n) { bp_glyph_s (col * 6 * scale, y, digits[--n], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
+		for (unsigned slot = 168; slot < 262 && shown < 6 && col + 10 < cols; slot++) {
+			if (!marble_display_counts[slot]) continue;
+			shown++;
+			bp_glyph_s (col * 6 * scale, y, ' ', 0xFFFFFFFFu, 0xFF000000u, scale); col++;
+			char num[8]; unsigned k = 0; uint64_t sv = slot;
+			do { num[k++] = (char)('0' + sv % 10); sv /= 10; } while (sv && k < sizeof (num));
+			while (k) { bp_glyph_s (col * 6 * scale, y, num[--k], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
+			bp_glyph_s (col * 6 * scale, y, 'x', 0xFFFFFFFFu, 0xFF000000u, scale); col++;
+			k = 0; sv = marble_display_counts[slot];
+			do { num[k++] = (char)('0' + sv % 10); sv /= 10; } while (sv && k < sizeof (num));
+			while (k) { bp_glyph_s (col * 6 * scale, y, num[--k], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
 		}
 	}
 	if (mCrashStage == 2) {
