@@ -20,7 +20,7 @@
 #define BP_LOGO_SCALE 5
 #define BP_PROGRESS_TOTAL 2290185ULL
 
-static unsigned mLogY, mHeaderY, mBarY;
+static unsigned mLogY, mHeaderY;
 
 static const uint64_t mFont[] = GLYPH_FONT;
 
@@ -138,31 +138,6 @@ bp_text_at (unsigned x, unsigned y, unsigned scale, const char *s, uint32_t fg)
 }
 
 static void
-bp_text_centered (unsigned y, unsigned scale, const char *s)
-{
-	unsigned width = (unsigned)strlen (s) * 6 * scale;
-	unsigned x = width < mWidth ? (mWidth - width) / 2 : 0;
-
-	bp_text_at (x, y, scale, s, 0xFFFFFFFFu);
-}
-
-static void
-bp_number_string (char *out, uint64_t value)
-{
-	char digits[24];
-	unsigned n = 0, i = 0;
-
-	do {
-		digits[n++] = (char)('0' + value % 10);
-		value /= 10;
-	} while (value && n < sizeof (digits));
-	while (n) {
-		out[i++] = digits[--n];
-	}
-	out[i] = 0;
-}
-
-static void
 bp_emit (char c)
 {
 	if (!mReady) {
@@ -222,61 +197,6 @@ bp_number (uint64_t value, unsigned base)
 	}
 }
 
-static unsigned
-bp_progress (void)
-{
-	uint64_t verified = native_ufs_verified_blocks;
-
-	if (verified >= BP_PROGRESS_TOTAL) {
-		return 100;
-	}
-	return (unsigned)((verified * 100) / BP_PROGRESS_TOTAL);
-}
-
-static void
-bp_bar (void)
-{
-	unsigned x0 = mWidth / 8, w = mWidth * 3 / 4, y = mBarY, pct = bp_progress ();
-	unsigned fill = (w - 8) * pct / 100;
-	char text[8];
-
-	bp_fill (x0, y, w, 4, 0xFFFFFFFFu);
-	bp_fill (x0, y + 24, w, 4, 0xFFFFFFFFu);
-	bp_fill (x0, y, 4, 28, 0xFFFFFFFFu);
-	bp_fill (x0 + w - 4, y, 4, 28, 0xFFFFFFFFu);
-	bp_fill (x0 + 4, y + 4, w - 8, 20, 0xFF000000u);
-	if (fill) {
-		bp_fill (x0 + 4, y + 4, fill, 20, 0xFFFFFFFFu);
-	}
-	bp_number_string (text, pct);
-	{
-		char line[16];
-		unsigned i = 0;
-		while (text[i]) {
-			line[i] = text[i];
-			i++;
-		}
-		line[i++] = '%';
-		line[i] = 0;
-		bp_text_centered (y + 36, BP_SCALE, line);
-	}
-}
-
-static void
-bp_splash (void)
-{
-	const char *logo = "UniXNU";
-	unsigned scale = BP_LOGO_SCALE;
-	unsigned width = (unsigned)strlen (logo) * 6 * scale;
-	unsigned x = width < mWidth ? (mWidth - width) / 2 : 0;
-	unsigned y = mHeight / 30;
-
-	for (const char *c = logo; *c; ++c) {
-		bp_glyph_s (x, y, *c, 0xFFFFFFFFu, 0xFF000000u, scale);
-		x += 6 * scale;
-	}
-}
-
 static void
 bp_header (void)
 {
@@ -289,7 +209,6 @@ bp_header (void)
 		absolutetime_to_nanoseconds (mach_absolute_time () - mStart, &ns);
 		seconds = (unsigned)(ns / NSEC_PER_SEC);
 	}
-	bp_bar ();
 	bp_fill (0, mHeaderY, mWidth, BP_LINE, 0xFF000000u);
 	mX = 0;
 	mY = mHeaderY;
@@ -332,7 +251,7 @@ bp_beat (void)
 	mBeat++;
 	bp_header ();
 	{
-		unsigned scale = 2, cell = 6 * scale, line = 14 * scale, y = mHeight * 7 / 100 + 20;
+		unsigned scale = 2, cell = 6 * scale, line = 14 * scale, y = mHeight / 100 + 8;
 		bp_fill (0, y, mWidth, 3 * line, 0xFF000000u);
 		unsigned col = 0;
 		const char *head = "CORES step ";
@@ -391,19 +310,17 @@ boot_progress_bind (uintptr_t base, unsigned width, unsigned height, unsigned ro
 	mHeight = height;
 	mRowBytes = rowbytes;
 	mCols = width / BP_CELL;
-	mBarY = mHeight * 12 / 100;
-	mStatusY = mBarY + 92;
-	mHeaderY = mHeight * 20 / 100;
-	mLogY = mHeaderY + BP_LINE;
+	mHeaderY = mHeight * 6 / 100;
+	mStatusY = mHeaderY + BP_LINE;
+	mLogY = mStatusY + BP_LINE;
 	mX = 0;
 	mY = mLogY;
 	mReady = 1;
 	if (bp_lock ()) {
 		bp_fill (0, 0, mWidth, mHeight, 0xFF000000u);
-		bp_splash ();
 		bp_header ();
 		bp_text_at (0, mStatusY, BP_SCALE, "EXEC -", 0xFFFFFFFFu);
-		bp_text ("MARBLE XNU BOOT\n");
+		bp_text ("marble bring-up page\n");
 		bp_unlock ();
 	}
 }
