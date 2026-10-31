@@ -9,7 +9,10 @@
 #include <sys/sysproto.h>
 #include <sys/fcntl.h>
 #include <sys/stat.h>
+#include <sys/unistd.h>
 #include <pexpert/pexpert.h>
+
+extern proc_t initproc;
 
 static const char policy_head[] =
  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -18,6 +21,9 @@ static const char policy_head[] =
 static const char policy_tail[] = "</dict></plist>\n";
 static char policy[2048], jobs[200];
 volatile int sheng_launch_policy_status = -1;
+uint64_t sheng_scratch;
+volatile int sheng_crash_log_ready = -1;
+char sheng_crash_log_text[1200];
 
 static int
 append_job (const char **cursor)
@@ -54,6 +60,7 @@ sheng_boot_watchdog_policy (void *process, uint64_t scratch)
 	int     watchdog = 0, error = 0, fd = -1;
 	int32_t result = 0;
 
+	sheng_scratch = scratch;
 	PE_parse_boot_argn ("sheng-disable-watchdogd", &watchdog, sizeof (watchdog));
 	if (!PE_parse_boot_argn ("sheng-disable-jobs", jobs, sizeof (jobs))) {
 		jobs[0] = 0;
@@ -159,5 +166,167 @@ done:
 	printf ("sheng bring-up launch policy: %d (%s)\n", error, error ? "not applied" : "disabled.plist written");
 	sheng_launch_policy_status = error;
 	/* The policy is advisory: never stop the boot for it. */
+	return 0;
+}
+
+struct sweet_dirent {
+	uint64_t d_ino;
+	uint16_t d_reclen;
+	uint8_t  d_type;
+	uint8_t  d_namlen;
+	char     d_name[256];
+};
+
+static int
+sweet_read_file (proc_t p, const char *path, uint64_t scratch, char *out, size_t want)
+{
+	int fd = -1, error = 0;
+	int32_t result = 0;
+
+	if ((error = copyout (path, scratch, strlen (path) + 1))) {
+		return error;
+	}
+	struct open_args op = { .path = scratch, .flags = O_RDONLY, .mode = 0 };
+	if ((error = open (p, &op, &result))) {
+		return error;
+	}
+	fd = result;
+	struct lseek_args ls = { .fd = fd, .offset = -(off_t)want, .whence = SEEK_END };
+	off_t moved = 0;
+	if (lseek (p, &ls, &moved)) {
+		struct lseek_args zero = { .fd = fd, .offset = 0, .whence = 0 };
+		(void)lseek (p, &zero, &moved);
+	}
+	struct read_args rd = { .fd = fd, .cbuf = scratch + 0x200, .nbyte = want - 1 };
+	user_ssize_t got = 0;
+	error = read (p, &rd, &got);
+	if (!error) {
+		if (got < 0 || got > (user_ssize_t)(want - 1)) {
+			error = EIO;
+		} else if ((error = copyin (scratch + 0x200, out, (size_t)got))) {
+			;
+		} else {
+			out[got] = 0;
+		}
+	}
+	struct close_args cl = { .fd = fd };
+	int close_error = sys_close (p, &cl, &result);
+	if (!error) {
+		error = close_error;
+	}
+	return error;
+}
+
+static int
+sweet_find_crash (proc_t p, uint64_t scratch, char *name, size_t namesz)
+{
+	static const char *directories[] = {
+		"/private/var/log/CrashReporter",
+		"/private/var/mobile/Library/Logs/CrashReporter",
+	};
+	char best[128] = "";
+
+	for (unsigned d = 0; d < sizeof (directories) / sizeof (directories[0]); d++) {
+		int fd = -1, error = 0;
+		int32_t result = 0;
+		if ((error = copyout (directories[d], scratch, strlen (directories[d]) + 1))) {
+			continue;
+		}
+		struct open_args op = { .path = scratch, .flags = O_RDONLY | O_DIRECTORY, .mode = 0 };
+		if ((error = open (p, &op, &result))) {
+			continue;
+		}
+		fd = result;
+		off_t position = 0;
+		for (;;) {
+			if (copyout (&position, scratch + 0x100, sizeof (position))) {
+				break;
+			}
+			struct getdirentries64_args gd = { .fd = fd, .buf = scratch + 0x200,
+			    .bufsize = 0x1000, .position = scratch + 0x100 };
+			user_ssize_t got = 0;
+			if (getdirentries64 (p, &gd, &got) || got <= 0) {
+				break;
+			}
+			char block[0x1000];
+			if (copyin (scratch + 0x200, block, (size_t)got) || copyin (scratch + 0x100, &position, sizeof (position))) {
+				break;
+			}
+			for (off_t at = 0; at + 12 <= (off_t)got;) {
+				struct sweet_dirent *entry = (struct sweet_dirent *)(block + at);
+				uint16_t reclen = entry->d_reclen;
+				uint8_t namlen = entry->d_namlen;
+				if (!reclen || at + reclen > (off_t)got) {
+					break;
+				}
+				if (namlen > 0 && namlen < sizeof (entry->d_name)) {
+					char entry_name[128];
+					size_t n = namlen < sizeof (entry_name) - 1 ? namlen : sizeof (entry_name) - 1;
+					memcpy (entry_name, entry->d_name, n);
+					entry_name[n] = 0;
+					size_t len = strlen (entry_name);
+					int match = (strncmp (entry_name, "backboardd", 10) == 0) ||
+					    (strncmp (entry_name, "SpringBoard", 11) == 0);
+					if (match && len > 4 && strcmp (entry_name + len - 4, ".ips") == 0 &&
+					    strcmp (entry_name, best) > 0) {
+						strlcpy (best, entry_name, sizeof (best));
+					}
+				}
+				at += reclen;
+			}
+		}
+		struct close_args cl = { .fd = fd };
+		(void)sys_close (p, &cl, &result);
+		if (best[0]) {
+			strlcpy (name, best, namesz);
+			return 0;
+		}
+	}
+	return ENOENT;
+}
+
+int
+sheng_crash_log_read (void)
+{
+	static char report[8192];
+	char path[160], name[128];
+	int error;
+
+	proc_t p = initproc;
+	if (!p || !sheng_scratch) {
+		sheng_crash_log_ready = -1;
+		return EAGAIN;
+	}
+	if ((error = sweet_find_crash (p, sheng_scratch, name, sizeof (name)))) {
+		sheng_crash_log_ready = -1;
+		return error;
+	}
+	snprintf (path, sizeof (path), "/private/var/log/CrashReporter/%s", name);
+	if (sweet_read_file (p, path, sheng_scratch, report, sizeof (report))) {
+		snprintf (path, sizeof (path), "/private/var/mobile/Library/Logs/CrashReporter/%s", name);
+		if ((error = sweet_read_file (p, path, sheng_scratch, report, sizeof (report)))) {
+			sheng_crash_log_ready = -1;
+			return error;
+		}
+	}
+	/* Keep the assertion text or the first exception line. */
+	const char *pick = NULL;
+	const char *keys[] = { "\"asi\"", "Assertion", "\"exception\"" };
+	for (unsigned i = 0; i < 3 && pick == NULL; i++) {
+		pick = strnstr (report, keys[i], sizeof (report));
+	}
+	if (pick == NULL) {
+		pick = report;
+	}
+	size_t out = 0;
+	for (const char *c = pick; *c && out < sizeof (sheng_crash_log_text) - 1; c++) {
+		if (out >= 180) {
+			break;
+		}
+		sheng_crash_log_text[out++] = (*c >= 32 && *c <= 126) ? *c : ' ';
+	}
+	sheng_crash_log_text[out] = 0;
+	sheng_crash_log_ready = 0;
+	printf ("sheng crash log: %s\n", name);
 	return 0;
 }

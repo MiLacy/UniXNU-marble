@@ -40,6 +40,13 @@ extern volatile uint64_t native_ufs_block_reads;
 extern uint64_t sweet_fb_swap_count;
 extern uint64_t sweet_fb_started;
 extern uint64_t sweet_fb_clients;
+extern uint64_t sweet_surf_calls;
+extern uint32_t sweet_surf_last;
+extern int sheng_crash_log_read (void);
+extern volatile int sheng_crash_log_ready;
+extern char sheng_crash_log_text[];
+static uint64_t mCrashAt;
+static unsigned mCrashStage;
 extern volatile int sheng_launch_policy_status;
 static unsigned mStatusY, mWhyY;
 extern volatile uint64_t native_ufs_verified_blocks;
@@ -296,6 +303,10 @@ bp_header (void)
 	bp_number (sweet_fb_swap_count, 10);
 	bp_emit ('/');
 	bp_number (sweet_fb_clients, 10);
+	bp_text (" SF ");
+	bp_number (sweet_surf_calls, 10);
+	bp_emit ('/');
+	bp_number (sweet_surf_last, 10);
 	bp_text (" POL ");
 	bp_number ((uint64_t)(unsigned)(sheng_launch_policy_status < 0 ? 9 : sheng_launch_policy_status), 10);
 	bp_emit ('\n');
@@ -316,6 +327,34 @@ bp_beat (void)
 	mLastBeat = now;
 	mBeat++;
 	bp_header ();
+	if (mCrashStage == 1) {
+		uint64_t wait = (uint64_t)mBeatInterval * (2 + 2 * (uint64_t)0);
+		if (now - mCrashAt >= 2 * wait) {
+			if (sheng_crash_log_read () == 0 && sheng_crash_log_ready == 0) {
+				mCrashStage = 2;
+			} else if (now - mCrashAt >= 8 * wait) {
+				mCrashStage = 2;
+				strlcpy (sheng_crash_log_text, "no crash report found", 64);
+			}
+		}
+	}
+	if (mCrashStage == 2) {
+		unsigned y = mHeight * 4 / 100;
+		unsigned scale = 2;
+		unsigned cols = mWidth / (6 * scale);
+		bp_fill (0, y, mWidth, 8 * 14 * scale, 0xFF000000u);
+		const char *s = sheng_crash_log_text;
+		for (unsigned line = 0; line < 8 && *s; line++) {
+			bp_text_at (0, y + line * 14 * scale, scale, "", 0xFFFFFFFFu);
+			unsigned col = 0;
+			while (*s && col < cols - 1) {
+				char ch = *s++;
+				bp_glyph_s (col * 6 * scale, y + line * 14 * scale, ch, 0xFFFFFFFFu, 0xFF000000u, scale);
+				col++;
+			}
+		}
+		mCrashStage = 3;
+	}
 	bp_unlock ();
 }
 
@@ -452,6 +491,11 @@ boot_progress_critical_exit (int pid, char *text, unsigned long size)
 void
 boot_progress_exit (int pid, const char *name, int status, unsigned ns, uint64_t code)
 {
+	if (ns == 2 && name && (strncmp (name, "backboardd", 10) == 0 ||
+	    strncmp (name, "SpringBoard", 11) == 0)) {
+		mCrashAt = mach_absolute_time ();
+		mCrashStage = 1;
+	}
 	if (!mReady || ns == 0 || !bp_lock ()) {
 		return;
 	}

@@ -428,6 +428,8 @@ public:
 
 OSDefineMetaClassAndStructors(IOSurfaceRootUserClient, IOUserClient);
 
+uint64_t sweet_surf_calls;
+uint32_t sweet_surf_last;
 static uint64_t sweet_surf_logged;      /* selectors / traps already logged (< 64) */
 
 static void
@@ -714,6 +716,8 @@ IOSurfaceRootUserClient::externalMethod(uint32_t selector, IOExternalMethodArgum
     __unused IOExternalMethodDispatch *dispatch, __unused OSObject *target,
     __unused void *reference)
 {
+	__atomic_fetch_add(&sweet_surf_calls, 1, __ATOMIC_RELAXED);
+	sweet_surf_last = selector;
 	uint64_t arg0 = args->scalarInputCount > 0 ? args->scalarInput[0] : 0;
 
 	switch (selector) {
