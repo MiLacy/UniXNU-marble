@@ -27,7 +27,7 @@ static unsigned mCols;
 static int mReady;
 static unsigned mLock;
 static uint64_t mStart;
-static int mBeatEvent;
+static uint64_t mBeatInterval;
 static volatile uint64_t mIrqCount, mBrkCount, mAbortCount;
 static volatile unsigned mBrkEsr, mAbortEsr, mAbortFar;
 static volatile int mBeat;
@@ -182,20 +182,20 @@ bp_header (void)
 	mY = saved_y;
 }
 
+static uint64_t mLastBeat;
+
 static void
-bp_heartbeat (void *parameter, wait_result_t result)
+bp_beat (void)
 {
-	(void)parameter;
-	(void)result;
-	for (;;) {
-		mBeat++;
-		if (mReady && bp_lock ()) {
-			bp_header ();
-			bp_unlock ();
-		}
-		assert_wait_timeout ((event_t)&mBeatEvent, THREAD_UNINT, 1000, NSEC_PER_MSEC);
-		thread_block (THREAD_CONTINUE_NULL);
+	uint64_t now = mach_absolute_time ();
+
+	if (!mReady || (mLastBeat && now - mLastBeat < mBeatInterval) || !bp_lock ()) {
+		return;
 	}
+	mLastBeat = now;
+	mBeat++;
+	bp_header ();
+	bp_unlock ();
 }
 
 void
@@ -234,7 +234,9 @@ boot_progress_bind (uintptr_t base, unsigned width, unsigned height, unsigned ro
 int
 boot_progress_active (void)
 {
-	return mReady;
+	/* Keep the serial console for kprintf: the diagnostic page only draws
+	 * the explicit stage/exec lines and the UFS-driven heartbeat. */
+	return 0;
 }
 
 void
@@ -262,12 +264,8 @@ boot_progress_stage (const char *message)
 void
 boot_progress_start (void)
 {
-	thread_t thread;
-
 	mStart = mach_absolute_time ();
-	if (kernel_thread_start_priority (bp_heartbeat, NULL, BASEPRI_PREEMPT_HIGH, &thread) == KERN_SUCCESS) {
-		thread_deallocate (thread);
-	}
+	nanoseconds_to_absolutetime (NSEC_PER_SEC, &mBeatInterval);
 	boot_progress_stage ("kernel bootstrap thread start");
 }
 
@@ -349,6 +347,7 @@ boot_progress_irq (uint64_t pc, uint64_t cpsr, uint64_t sp)
 void
 boot_progress_poll (void)
 {
+	bp_beat ();
 }
 
 int
