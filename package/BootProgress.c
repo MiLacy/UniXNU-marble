@@ -431,12 +431,6 @@ boot_progress_process_stage (int pid, const char *name, const char *stage)
 		mX = saved_x;
 		mY = saved_y;
 	}
-	bp_text (name ? name : "?");
-	bp_emit ('[');
-	bp_number ((uint64_t)(unsigned)pid, 10);
-	bp_text ("] ");
-	bp_text (stage ? stage : "?");
-	bp_emit ('\n');
 	bp_unlock ();
 }
 
