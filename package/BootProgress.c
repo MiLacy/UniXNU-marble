@@ -39,6 +39,7 @@ static volatile int mBeat;
 extern volatile uint64_t native_ufs_block_reads;
 extern uint64_t sweet_fb_swap_count;
 extern uint64_t sweet_fb_started;
+extern uint64_t sweet_fb_clients;
 extern volatile int sheng_launch_policy_status;
 static unsigned mStatusY;
 extern volatile uint64_t native_ufs_verified_blocks;
@@ -293,6 +294,8 @@ bp_header (void)
 	bp_number (sweet_fb_started, 10);
 	bp_emit ('/');
 	bp_number (sweet_fb_swap_count, 10);
+	bp_emit ('/');
+	bp_number (sweet_fb_clients, 10);
 	bp_text (" POL ");
 	bp_number ((uint64_t)(unsigned)(sheng_launch_policy_status < 0 ? 9 : sheng_launch_policy_status), 10);
 	bp_emit ('\n');

@@ -46,6 +46,7 @@
 extern "C" void boot_progress_stage(const char *message);
 uint64_t sweet_fb_swap_count;
 uint64_t sweet_fb_started;
+uint64_t sweet_fb_clients;
 
 enum {
 	kSweetFBGetLayerDefaultSurface  = 3,
@@ -355,6 +356,7 @@ IOMobileFramebufferUserClient::start(IOService *provider)
 		return false;
 	}
 	fFB->addClient(this);
+	__atomic_fetch_add(&sweet_fb_clients, 1, __ATOMIC_RELAXED);
 	return true;
 }
 
@@ -362,6 +364,7 @@ IOReturn
 IOMobileFramebufferUserClient::clientClose(void)
 {
 	if (fFB != NULL) {
+		__atomic_fetch_sub(&sweet_fb_clients, 1, __ATOMIC_RELAXED);
 		fFB->removeClient(this);
 		IOLockLock(fFB->fLock);
 		mach_port_t old = fPort;
