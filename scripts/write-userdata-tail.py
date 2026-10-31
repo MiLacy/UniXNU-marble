@@ -32,6 +32,14 @@ def adb(args, **kwargs):
     return run(['adb', 'shell', *args], **kwargs)
 
 
+def device_root(command, **kwargs):
+    """Run a command as root: direct in TWRP, through su on rooted Android."""
+    uid = run(['adb', 'shell', 'id', '-u'], capture_output=True)
+    if uid.stdout.strip() == '0':
+        return adb([command], **kwargs)
+    return adb([f'su -c "{command}"'], **kwargs)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
@@ -83,17 +91,17 @@ def main():
     # Preserve and verify the first partition block (Android ext4 or its metadata).
     before = '/tmp/marble-userdata-head.before'
     after = '/tmp/marble-userdata-head.after'
-    if adb([f'su -c "dd if={args.block_device} of={before} bs={BLOCK} count=1"']).returncode:
+    if device_root(f'dd if={args.block_device} of={before} bs={BLOCK} count=1').returncode:
         return 1
-    if adb([f'su -c "dd if={args.remote_image} of={args.block_device} bs={BLOCK} '
-            f'seek={SEEK} count={ROOT_BLOCKS} conv=notrunc,fsync"']).returncode:
+    if device_root(f'dd if={args.remote_image} of={args.block_device} bs={BLOCK} '
+                   f'seek={SEEK} count={ROOT_BLOCKS} conv=notrunc,fsync').returncode:
         return 1
-    if adb([f'su -c "sync"']).returncode:
+    if device_root('sync').returncode:
         return 1
-    if adb([f'su -c "dd if={args.block_device} of={after} bs={BLOCK} count=1"']).returncode:
+    if device_root(f'dd if={args.block_device} of={after} bs={BLOCK} count=1').returncode:
         return 1
-    compared = adb([f'su -c "cmp -s {before} {after} && echo UNCHANGED || echo CHANGED"'],
-                   capture_output=True)
+    compared = device_root(f'cmp -s {before} {after} && echo UNCHANGED || echo CHANGED',
+                           capture_output=True)
     print(compared.stdout.strip())
     if 'UNCHANGED' not in compared.stdout:
         print('the first userdata block changed; stop and inspect before booting', file=sys.stderr)
