@@ -298,6 +298,19 @@ sheng_crash_log_read (void)
 		return EAGAIN;
 	}
 	if ((error = sweet_find_crash (p, sheng_scratch, name, sizeof (name)))) {
+		/* No crash report yet: show the launchd log tail instead. */
+		if ((error = sweet_read_file (p, "/private/var/log/com.apple.xpc.launchd/launchd.log",
+		    sheng_scratch, report, sizeof (report))) == 0) {
+			size_t out = 0;
+			const char *c = report;
+			for (; *c && out < sizeof (sheng_crash_log_text) - 1; c++) {
+				sheng_crash_log_text[out++] = (*c >= 32 && *c <= 126) ? *c : ' ';
+			}
+			sheng_crash_log_text[out] = 0;
+			sheng_crash_log_ready = 0;
+			printf ("sheng launchd log tail shown\n");
+			return 0;
+		}
 		sheng_crash_log_ready = -1;
 		return error;
 	}
