@@ -20,6 +20,7 @@ import importlib.util
 import json
 from pathlib import Path
 import plistlib
+import re
 import stat
 import subprocess
 import uuid
@@ -83,11 +84,18 @@ def main():
     if len(found) != 1:
         raise SystemExit('Require one existing exact read-only image attachment')
     entities = found[0]['system-entities']
+    volume_info = plistlib.loads(subprocess.check_output(['diskutil', 'info', '-plist', str(mountpoint)]))
     whole = [e['dev-entry'] for e in entities if e.get('content-hint') == 'GUID_partition_scheme']
+    if not whole:
+        # SystemOS is a raw UDRW APFS container: hdiutil exposes the whole
+        # disk without a GPT partition scheme.
+        whole = [e['dev-entry'] for e in entities if re.fullmatch(r'/dev/disk\d+', e.get('dev-entry', ''))]
+    if not whole:
+        match = re.match(r'(/dev/disk\d+)', volume_info.get('DeviceNode', ''))
+        whole = [match.group(1)] if match else []
     if len(whole) != 1:
         raise SystemExit('Require one actual whole virtual media mapping')
     info = plistlib.loads(subprocess.check_output(['diskutil', 'info', '-plist', whole[0]]))
-    volume_info = plistlib.loads(subprocess.check_output(['diskutil', 'info', '-plist', str(mountpoint)]))
     if (info.get('BusProtocol') != 'Disk Image' or info.get('Writable') is not False or
             info.get('DeviceNode') != whole[0] or info.get('TotalSize') != expected_bytes or
             volume_info.get('VolumeUUID') != str(expected_uuid).upper() or volume_info.get('Writable') is not False or
