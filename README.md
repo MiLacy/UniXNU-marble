@@ -81,6 +81,28 @@ partition is left alone; the image is written with
 | root `kernel.macho` | 51,146,752 | `b1ae430bf1105e433f780ae88c762ddfcb2ab39d96963da4a98ae174f6105918` |
 | `userdata-root.img` | 9,382,658,048 | `fd43ee7035ce185ce4215ac93fdc006fd784a54b3b7442e21457c226cbe03093` |
 
+### On-screen boot log
+
+[`configs/marble-root_defconfig`](configs/marble-root_defconfig) with
+`CONFIG_XNU_BOOT_PROGRESS=y` links `libBootProgress.a` and routes the kernel
+console to the framebuffer. The screen shows the `ALIVE` heartbeat, stage
+lines, `SystemOS mount enter/returned` and per-exec lines.
+
+Build artifact (same userdata tail):
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `artifacts/marble-root-screenlog/boot.img` | `99998e8a5b9b72d2d7143ddab699e785791a2d9a8dcbe9dcad9e5b62cde84f7b` |
+| payload | `9c63887dee86a6c976192cbddc8455e59ee597c4d2a29dd456f441ff9d8760db` |
+| screen-log kernel | `51f44694f19cf829a87462f0c431b2dfa00cf7c7914c355fa90a13e074be2716` |
+
+```sh
+fastboot boot artifacts/marble-root-screenlog/boot.img
+```
+
+This is still screen-only: XNU has no adb or USB serial channel. The
+`--no-panic-screen` debug image is a separate fallback.
+
 The root is **unverified**: the payload passes `native-ufs-allow-unverified=1`
 and `root-unverified=1`. This build also enables the read-only SystemOS union
 through a development-only UUID lookup, so `libSystem.B.dylib` can come from
