@@ -22,20 +22,24 @@ and observations to capture are in [REAL-DEVICE-TESTS.md](docs/REAL-DEVICE-TESTS
 
 ## Built artifacts (host, no device result)
 
-| Artifact | SHA-256 |
-| --- | --- |
-| `boot-empty.img` (Stage 1) | `823a96d29602be5d2a678f8f9ecc054254b6f5c7482eaa3743be66069a6dc28d` |
-| `boot.img` (full UFS root) | `ce8b5f6e57c716ecf0605839734bd2806d4ae470c83d96eb829842caff6147cc` |
-| Firmware FD (3 MiB) | `6c52e8a4dcdd1483d7ca672de67725f8c76a60ececa956ba81d38a3aa4f7d4b4` |
-| Firmware DTB | `58dca5dbe30e2d0f8ba599f3ff8d0c72b691ab07895cbf09807e67a136fbd2b3` |
-| `kernel.macho` (full UFS root) | `c3ea36a2b438f2f84bca0e342699b9640dfb61a7631463576674a1b63a1795bd` |
-| `userdata-root.img` (8.8 GiB) | `fd43ee7035ce185ce4215ac93fdc006fd784a54b3b7442e21457c226cbe03093` |
-| Trust bundle | `7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7` |
+The Stage 1 artifacts below were rebuilt on 2026-11-01 from the published
+UEFI commit and the `UniXNU` checkout. EDK II embeds its build time, so a
+rebuild produces a different FD hash; compare size, FV contents and
+`boot.json`, not only the hash.
 
-The images are under
-`../UniXNU/out/marble/ipados-17.7.11-21H461/marble/boot/` and
-`.../marble/userdata/`. `hardware_tested` is false in `boot.json`: the full
-UFS root image has not been run on marble yet.
+| Artifact | Size | SHA-256 |
+| --- | --- | --- |
+| Firmware FD, DEBUG | 3,145,728 | `7bce194a149ace272581f870a8baa16499ae985be4a2490454f71fb8b5d211a4` |
+| `boot-empty.img` (Stage 1) | 1,835,008 | `8adf6380c2991c389b6c08cbfc86036543f2fa647c71c34e3d52523c69f891cd` |
+| Firmware DTB | 649,254 | `a338d301291ed3d44c587a4f6534c9d4ce71168174c7c16546d07158125ba05b` |
+
+The Stage 1 image is at
+`../UniXNU/out/marble/ipados-17.7.11-21H461/marble/boot/boot-empty.img`;
+`hardware_tested` is false in `boot.json`. The full commands and checks are
+in [docs/BUILD-2026-11-01.md](docs/BUILD-2026-11-01.md). The earlier full-root
+`boot.img`, `kernel.macho`, trust bundle and 8.8 GiB `userdata-root.img`
+were produced by the previous workspace and are **not** part of this
+checkout. Rebuild them with the external inputs listed below.
 
 ## Hardware summary
 
@@ -49,7 +53,7 @@ UFS root image has not been run on marble yet.
 | Display | 1080x2400, GOP framebuffer from UEFI | Mu-Silicium marble DSC |
 | Splash / display reserved | `0xB8000000 + 0x2B00000` | stock marble DT |
 | Touch | Goodix GT9916S on SPI `0x990000`, IRQ GPIO21, reset GPIO20 | stock marble DT |
-| Firmware DTB | `Resources/DTBs/marble-unixnu.dtb` in Mu-Silicium-marble | Mu-Silicium |
+| Firmware DTB | `Resources/DTBs/marble-unixnu.dtb` in uefi-marble | uefi-marble |
 | UEFI FD | base `0xA7100000`, size `0x300000` | `Resources/Configs/marble.toml` |
 
 The full inventory, including the capture commands, is in
@@ -62,7 +66,7 @@ The full inventory, including the capture commands, is in
 | [UniXNU](https://github.com/UniXNU/UniXNU) | `../UniXNU` | build driver, ARM64 profile, OS profile, UEFI package |
 | [`UniXNU-sm7475-common`](https://github.com/MiLacy/UniXNU-sm7475-common) | `../UniXNU-sm7475-common` | shared SM7475 DTSI and SMP/cluster patches |
 | `UniXNU-marble` | this directory | board configuration, DTS, package and test record |
-| `Mu-Silicium-marble` | `../Mu-Silicium-marble` | UEFI platform, marble DSC/FDF and firmware DTB |
+| `uefi-marble` | `../uefi-marble` | fork of `chibishizuku/Mu-Silicium-marble` with the UniXNU integration, marble DSC/FDF and firmware DTB |
 
 `drivers/ShengUfs` is a board fork of the catalog component at
 `e2b32cc429e8cf1501161c1d8c517f8994ceb9b2`. Its changes are the apps-SMMU
@@ -83,7 +87,10 @@ virtual) and the built `kernel.macho` symbol table.
 ## Build
 
 Run from the main UniXNU checkout. The UEFI checkout and Mu_Basecore paths are
-local build inputs.
+local build inputs. Apply
+[`patches/unixnu/0001-bootimg-existing-dtb-node.patch`](patches/unixnu/0001-bootimg-existing-dtb-node.patch)
+to a stock UniXNU tree first; it lets `bootimg` add the fixed `/chosen` range
+to the existing firmware DTB node.
 
 ```sh
 cd ../UniXNU
@@ -97,13 +104,13 @@ Firmware and the first boot image:
 
 ```sh
 ./unixnu build firmware -D ../UniXNU-marble \
-  --uefi ../Mu-Silicium-marble \
-  --edk2 ../Mu-Silicium-marble/Mu_Basecore
+  --uefi ../uefi-marble \
+  --edk2 ../uefi-marble/Mu_Basecore
 
 ./unixnu bootimg -D ../UniXNU-marble \
-  --uefi ../Mu-Silicium-marble \
-  --fd ../Mu-Silicium-marble/Build/marblePkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd \
-  --dtb ../Mu-Silicium-marble/Resources/DTBs/marble-unixnu.dtb \
+  --uefi ../uefi-marble \
+  --fd ../uefi-marble/Build/marblePkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd \
+  --dtb ../uefi-marble/Resources/DTBs/marble-unixnu.dtb \
   --ramdisk none
 ```
 
@@ -122,13 +129,13 @@ python3 out/marble/ipados-17.7.11-21H461/marble/tree/scripts/make-marble-trust.p
 
 # payload: kernel, ADT and trust cache; the current build has no Data seed
 ./unixnu build payload -D ../UniXNU-marble \
-  --uefi ../Mu-Silicium-marble \
+  --uefi ../uefi-marble \
   --trust-cache out/marble/ipados-17.7.11-21H461/marble/tree/build/marble-trust.bundle \
   --unique-chip-id 4d4152424c45
 
 ./unixnu bootimg -D ../UniXNU-marble \
-  --uefi ../Mu-Silicium-marble \
-  --dtb ../Mu-Silicium-marble/Resources/DTBs/marble-unixnu.dtb
+  --uefi ../uefi-marble \
+  --dtb ../uefi-marble/Resources/DTBs/marble-unixnu.dtb
 ```
 
 The OS profile supplies the Apple iPad7,1 identity, kernelcache hash and
@@ -138,23 +145,33 @@ replace it with a per-device value when installing.
 
 ## UEFI integration
 
-`Mu-Silicium-marble` was modified in place:
+`uefi-marble` is a fork of
+[`chibishizuku/Mu-Silicium-marble`](https://github.com/chibishizuku/Mu-Silicium-marble)
+at `fc9e410d`. The integration commit is `d1f18525` (branch
+`unixnu-marble`); a standalone patch is in
+[`firmware/uefi-marble-integration.patch`](firmware/uefi-marble-integration.patch).
 
-- `Platforms/Xiaomi/marblePkg/marble.dsc` lists `UniXNU.inf`,
-  `UniXNUDxe.inf`, `UniXNURamDiskDxe.inf`, `DarwinBoot.inf` and the
-  `UniXNULib`, `FdtLib` and `HobLib` library mappings.
-- `Platforms/Xiaomi/marblePkg/Include/DXE.inc` places the four modules in the
-  firmware volume. `DiskIoDxe`, `PartitionDxe`, `Fat` and `EnglishDxe` were
-  already present.
+- `Platforms/Xiaomi/marblePkg/marble.dsc` defines `UNIXNU_PAYLOAD=1` and maps
+  `UniXNULib`. `FdtLib` and `HobLib` come from `SiliciumPkg.dsc.inc`.
+- `Silicon/Qualcomm/PalimaPkg/PalimaPkg.dsc.inc` adds `UniXNU.inf`,
+  `UniXNUDxe.inf`, `UniXNURamDiskDxe.inf` and `DarwinBoot.inf` under that
+  define.
+- `Platforms/Xiaomi/marblePkg/marble.fdf` places the same four modules in
+  `FVMAIN`. `DiskIoDxe`, `PartitionDxe`, `Fat` and `EnglishDxe` were already
+  present in `DXE.inc`.
+- `Silicon/Silicium/SiliciumPkg/Sec/AArch64/ModuleEntryPoint.S` preserves the
+  bootloader's `x0` in `x19`; `Sec.c` publishes it as the
+  `DAEE82E6-8090-4E72-BFB9-78C13CD4E359` entry-argument HOB.
+- `BootShim/BootShim.S` writes the full shim-plus-FD size into the ARM64
+  image header so `unixnu bootimg` can verify the image.
 - The four Mu-Silicium edk2 patches (`Auth-Service`, `Boot-Manager`, `Timer`,
   `Usb-Bus`) are applied by `board.toml [firmware] patches` for the build and
   reverted afterwards.
 
-The boot-image DTB is
-`Mu-Silicium-marble/Resources/DTBs/marble-unixnu.dtb`, derived from the stock
-`marble.dtb` by deleting the stale `/chosen` initrd properties. It keeps
-`cont_splash_region`. `[[bootimg.dtb_node]]` adds the fixed v0 initrd range
-`0x80C00000-0x84C00000` to `/chosen`.
+The boot-image DTB is `uefi-marble/Resources/DTBs/marble-unixnu.dtb`, derived
+from the stock `marble.dtb` by deleting the stale `/chosen` initrd properties;
+it keeps `cont_splash_region`. `[[bootimg.dtb_node]]` adds the fixed v0 initrd
+range `0xA8000000-0xB2000000` to `/chosen`, matching the 160 MiB payload.
 
 ### Boot chain fixes (verified on marble)
 
@@ -176,8 +193,8 @@ XNU, then AMFI stopped at `No PMGR?`. The seven fixes are:
    controllers before scanning for `unixnu.toml`.
 4. **Boot image v0 with a fixed ramdisk.** `fastboot boot` does not reliably
    load the v4 ramdisk on marble. The board uses an Android v0 image with the
-   kernel at `0x80008000`, the 64 MiB payload at `0x80C00000`, and the DTB
-   `/chosen` initrd range matching it.
+   kernel at `0x80008000`, the 160 MiB payload at `0xA8000000`, and the DTB
+   `/chosen` initrd range `0xA8000000-0xB2000000` matching it.
 5. **Gunyah physical-timer trap.** The panic came through XNU's `sleh` EL1
    vector, so the kernel was already at EL1; Gunyah nevertheless traps the
    EL1 `CNTP_CTL_EL0` write as UNDEF (`instr=d51be228`, PC
@@ -204,8 +221,9 @@ is discovered and the `no boot entry found` notice is gone. The kernel
 continues past `fiq_context_init` and the ADT interrupt map. With the
 PMGR placeholder it should pass AMFI and stop at the missing root device.
 
-The current `boot.img` is the **full UFS root image** (`native-ufs-root=1`),
-paired with `userdata-root.img`. The earlier read-only probe
+The previous workspace produced a full UFS root `boot.img`
+(`native-ufs-root=1`) paired with `userdata-root.img`; it is not included in
+this checkout. The earlier read-only probe
 (`native-ufs-probe=10`) recorded the geometry: `userdata` first `0x2f6a00`,
 last `0x3b037fa` (4096-byte LBAs), no `SHNGROOT` manifest. Flashing the
 userdata image overwrites Android user data; back up first. See

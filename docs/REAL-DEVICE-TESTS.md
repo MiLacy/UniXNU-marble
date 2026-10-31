@@ -24,25 +24,25 @@ then disappears on the next reset instead of replacing the boot partition.
    adb reboot bootloader
    fastboot devices
    ```
-4. Keep the stock boot image and a known-good Android image available.
-5. Build the Stage 1 image from the main UniXNU checkout:
+5. Keep the stock boot image and a known-good Android image available.
+6. Build the Stage 1 image from the main UniXNU checkout:
    ```sh
    cd ../UniXNU
    ./unixnu defconfig marble_defconfig -D ../UniXNU-marble
    ./unixnu fetch -D ../UniXNU-marble
    ./unixnu tree -D ../UniXNU-marble
    ./unixnu build firmware -D ../UniXNU-marble \
-     --uefi ../Mu-Silicium-marble \
-     --edk2 ../Mu-Silicium-marble/Mu_Basecore
+     --uefi ../uefi-marble \
+     --edk2 ../uefi-marble/Mu_Basecore
    ./unixnu bootimg -D ../UniXNU-marble \
-     --uefi ../Mu-Silicium-marble \
-     --fd ../Mu-Silicium-marble/Build/marblePkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd \
-     --dtb ../Mu-Silicium-marble/Resources/DTBs/marble-unixnu.dtb \
+     --uefi ../uefi-marble \
+     --fd ../uefi-marble/Build/marblePkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd \
+     --dtb ../uefi-marble/Resources/DTBs/marble-unixnu.dtb \
      --ramdisk none
    ```
-   The payload image is written to
-   `out/marble/ipados-17.7.11-21H461/marble/boot/boot.img`. The host build
-   already produced both images; the empty one is `boot-empty.img` beside it.
+   The Stage 1 image is written to
+   `out/marble/ipados-17.7.11-21H461/marble/boot/boot-empty.img`. A payload
+   image is a separate build and needs the external kernel and trust inputs.
 
 ---
 
@@ -55,8 +55,10 @@ then disappears on the next reset instead of replacing the boot partition.
 fastboot boot out/marble/ipados-17.7.11-21H461/marble/boot/boot-empty.img
 ```
 
-The built empty image SHA-256 is
-`823a96d29602be5d2a678f8f9ecc054254b6f5c7482eaa3743be66069a6dc28d`.
+The 2026-11-01 empty image is 1,835,008 bytes with SHA-256
+`8adf6380c2991c389b6c08cbfc86036543f2fa647c71c34e3d52523c69f891cd`.
+EDK II embeds a build timestamp, so compare `boot.json` and the FV files when
+you rebuild instead of requiring this hash.
 
 Expected:
 
@@ -81,10 +83,10 @@ If the screen stays black or the phone resets:
    `Resources/Configs/marble.toml` (`0x300000`).
 2. Check that `SILICIUM_UEFI.fd` contains `UniXNU.efi`, `UniXNUDxe.efi`,
    `UniXNURamDiskDxe.efi` and `DarwinBoot.efi`.
-3. Check the boot image header is v0 with kernel `0x80008000` and ramdisk
-   `0x80C00000`, and that the appended DTB is
-   `Resources/DTBs/marble-unixnu.dtb` with `/chosen` initrd
-   `0x80C00000-0x84C00000`.
+3. Check the boot image header is v0 with kernel `0x80008000`; for a payload
+   image the 160 MiB ramdisk is at `0xA8000000`, and the appended
+   `Resources/DTBs/marble-unixnu.dtb` carries `/chosen` initrd
+   `0xA8000000-0xB2000000`.
 4. Read [bring-up stage 1](https://unixnu.com/porting/bring-up).
 
 Do not continue to Stage 2 until Stage 1 is repeatable.
@@ -114,20 +116,20 @@ cd ../UniXNU
 ./unixnu ipsw fetch -D ../UniXNU-marble StaticTrustCache Cryptex1,SystemTrustCache
 python3 out/marble/ipados-17.7.11-21H461/marble/tree/scripts/make-marble-trust.py
 ./unixnu build payload -D ../UniXNU-marble \
-  --uefi ../Mu-Silicium-marble \
+  --uefi ../uefi-marble \
   --trust-cache out/marble/ipados-17.7.11-21H461/marble/tree/build/marble-trust.bundle \
   --unique-chip-id 4d4152424c45
 ./unixnu bootimg -D ../UniXNU-marble \
-  --uefi ../Mu-Silicium-marble \
-  --dtb ../Mu-Silicium-marble/Resources/DTBs/marble-unixnu.dtb
+  --uefi ../uefi-marble \
+  --dtb ../uefi-marble/Resources/DTBs/marble-unixnu.dtb
 fastboot boot out/marble/ipados-17.7.11-21H461/marble/boot/boot.img
 ```
 
 The Stage 2 result recorded with the first-console image was
 `c615520c88e79e78d170bc1309b132a3f4465017cab46ae8f5bfd887cc2931b9`. The
-current `boot.img` is the Stage 3 full UFS root image
-`ce8b5f6e57c716ecf0605839734bd2806d4ae470c83d96eb829842caff6147cc`; use it
-for the storage stage below.
+full-root `boot.img` (`ce8b5f6e...`) and the trust bundle were produced by the
+previous workspace and are not part of this checkout. Rebuild them from the
+external inputs before running the storage stage.
 
 Expected:
 

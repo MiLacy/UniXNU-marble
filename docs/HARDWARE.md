@@ -1,14 +1,15 @@
 # Marble hardware inventory
 
-Sources:
+Sources (the upstream `chibishizuku/Mu-Silicium-marble` checkout, locally
+`uefi-marble`):
 
-- `Mu-Silicium-marble/Resources/DTBs/marble.dts` and `marble.dtb`, the stock
+- `uefi-marble/Resources/DTBs/marble.dts` and `marble.dtb`, the stock
   crDroidAndroid-15.0 marble device tree used by the UEFI port.
-- `Mu-Silicium-marble/Resources/DTBs/marble-unixnu.dtb`, the boot-image copy
+- `uefi-marble/Resources/DTBs/marble-unixnu.dtb`, the boot-image copy
   with the stale `/chosen` initrd properties removed.
-- `Mu-Silicium-marble/Platforms/Xiaomi/marblePkg/Library/MemoryMapLib/MemoryMapLib.c`
+- `uefi-marble/Platforms/Xiaomi/marblePkg/Library/MemoryMapLib/MemoryMapLib.c`
   and `ConfigurationMapLib/ConfigurationMapLib.c`.
-- `Mu-Silicium-marble/Resources/Configs/marble.toml`.
+- `uefi-marble/Resources/Configs/marble.toml`.
 - `sing0626/UniXNU-marble` (legacy port) hardware notes, used only for
   cross-checks.
 
@@ -133,9 +134,9 @@ The touch path needs a GENI SPI + GPI DMA + Goodix protocol driver and an
 | UEFI config | `Resources/Configs/marble.toml` |
 | UEFI FD base | `0xA7100000` |
 | UEFI FD size | `0x300000` (3 MiB) |
-| Boot header | Android boot image v0 (kernel `0x80008000`, ramdisk `0x80C00000`) |
+| Boot header | Android boot image v0 (kernel `0x80008000`, 160 MiB ramdisk `0xA8000000-0xB2000000`) |
 | Boot image kernel | gzip(BootShim + FD) + appended firmware DTB |
-| Firmware DTB | `Resources/DTBs/marble-unixnu.dtb` (stock tree minus stale `/chosen` initrd properties; keeps `cont_splash_region`) |
+| Firmware DTB | `Resources/DTBs/marble-unixnu.dtb` (stock tree minus stale `/chosen` initrd properties; keeps `cont_splash_region`); SHA-256 `a338d301291ed3d44c587a4f6534c9d4ce71168174c7c16546d07158125ba05b` |
 | Boot partition | 192 MiB (`0xC000000`) |
 
 The firmware volume path is

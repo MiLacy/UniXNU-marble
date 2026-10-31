@@ -1,0 +1,19 @@
+diff --git a/scripts/unixnu/bootimg.py b/scripts/unixnu/bootimg.py
+index 259fb29..d6742ae 100644
+--- a/scripts/unixnu/bootimg.py
++++ b/scripts/unixnu/bootimg.py
+@@ -47,7 +47,13 @@ def patch_dtb(dtb, nodes, scratch):
+     work = scratch / 'device.dtb'
+     work.write_bytes(dtb)
+     for node in nodes:
+-        run([fdtput, '-c', work, node['path']], capture=True)
++        try:
++            run([fdtput, '-c', work, node['path']], capture=True)
++        except Error as error:
++            # fdtput -c is create-only. A board may add properties to a node
++            # the firmware DTB already provides (for example /chosen).
++            if 'FDT_ERR_EXISTS' not in str(error):
++                raise
+         for prop in node.get('props', []):
+             values = prop['value'] if isinstance(prop['value'], list) else [prop['value']]
+             run([fdtput, '-t', prop.get('type', 's'), work, node['path'], prop['name'], *[str(v) for v in values]], capture=True)

@@ -117,8 +117,9 @@ unique_chip_id = "required"
 ipad_identity = true
 
 # Android boot image v0: the fastboot boot path on marble does not reliably
-# load the v4 ramdisk. The kernel lands at 0x80008000 and the 64 MiB payload
-# at 0x80c00000-0x84c00000, below the PIL reservation at 0x85200000.
+# load the v4 ramdisk. The kernel lands at 0x80008000 and the 160 MiB payload
+# at 0xA8000000-0xB2000000, above the PIL reservation at 0x85200000 and below
+# the display reservation at 0xB8000000.
 [bootimg.image]
 base = 0x80000000
 kernel_offset = 0x8000
