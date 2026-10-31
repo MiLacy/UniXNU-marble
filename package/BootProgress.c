@@ -272,9 +272,22 @@ boot_progress_start (void)
 void
 boot_progress_process_stage (int pid, const char *name, const char *stage)
 {
+	static uint64_t window;
+	static unsigned lines;
+	uint64_t now = mach_absolute_time ();
+
 	if (!mReady || !bp_lock ()) {
 		return;
 	}
+	if (!window || now - window >= mBeatInterval) {
+		window = now;
+		lines = 0;
+	}
+	if (lines >= 12) {
+		bp_unlock ();
+		return;
+	}
+	lines++;
 	bp_text (name ? name : "?");
 	bp_emit ('[');
 	bp_number ((uint64_t)(unsigned)pid, 10);
@@ -350,10 +363,3 @@ boot_progress_poll (void)
 	bp_beat ();
 }
 
-int
-sheng_boot_watchdog_policy (void *process, uint64_t scratch)
-{
-	(void)process;
-	(void)scratch;
-	return 0;
-}

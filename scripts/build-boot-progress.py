@@ -47,13 +47,39 @@ command += ['-I', str(font_dir)]
 subprocess.run(command, cwd=record['directory'], check=True, timeout=120)
 (OUT / 'compile-command.json').write_text(json.dumps(command, indent=2) + '\n')
 
+policy_record = json.loads((ROOT / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/bsd/DEVELOPMENT/kern_exec.o.json').read_text().strip().rstrip(','))
+policy_source = ROOT / 'kits/marble/BootLaunchPolicy.c'
+policy_obj = OUT / 'BootLaunchPolicy.o'
+policy_command = []
+policy_args = policy_record['arguments']
+j = 0
+while j < len(policy_args):
+    value = policy_args[j]
+    if value == policy_record['file']:
+        policy_command.append(str(policy_source))
+    elif value in ('-o', '-MF', '-MT', '-MJ'):
+        if value == '-o':
+            policy_command += ['-o', str(policy_obj)]
+        j += 1
+    elif value in ('-MD', '-MP'):
+        pass
+    elif value == '-Xclang' and j + 1 < len(policy_args) and policy_args[j + 1].startswith('-W'):
+        j += 1
+    elif value.startswith('-W'):
+        pass
+    else:
+        policy_command.append(value)
+    j += 1
+subprocess.run(policy_command, cwd=policy_record['directory'], check=True, timeout=120)
+
 archive = OUT / 'libBootProgress.a'
 archive.unlink(missing_ok=True)
 archiver = ['llvm-ar'] if shutil.which('llvm-ar') else ['xcrun', 'ar']
-subprocess.run([*archiver, 'rcs', str(archive), str(obj)], check=True, timeout=60)
+subprocess.run([*archiver, 'rcs', str(archive), str(obj), str(policy_obj)], check=True, timeout=60)
 
 (OUT / 'build-report.json').write_text(json.dumps({
     'source_sha256': hashlib.sha256(source.read_bytes()).hexdigest(),
+    'launch_policy_sha256': hashlib.sha256(policy_source.read_bytes()).hexdigest(),
     'archive_sha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
     'hardware_execution': False,
 }, indent=2) + '\n')
