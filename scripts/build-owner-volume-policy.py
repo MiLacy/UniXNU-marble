@@ -29,7 +29,7 @@ OS_UUID = '04769D26-2CA0-4825-B443-E2E5F88300F2'
 OS_IMAGE_SHA256 = 'e5634d04a8ac35f024845f583394e0a35deb26a04cb0c00286a8674e25a9a4f2'
 OS_BYTES = 6077580800
 OS_BLOCKS = 1483785
-SYSTEMOS_UUID = '9071148B-B025-402D-AD7A-48464D8B5FFF'
+SYSTEMOS_UUID = '8846FE78-2910-4297-AF97-D59BB6F8FC16'
 SYSTEMOS_IMAGE_SHA256 = 'b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f'
 SYSTEMOS_BYTES = 3303014400
 SYSTEMOS_BLOCKS = 806400
@@ -98,6 +98,12 @@ def main():
         if (candidate.get('BusProtocol') == 'Disk Image' and candidate.get('TotalSize') == expected_bytes and
                 candidate.get('Writable') is False):
             good.append((device, candidate))
+    if len(good) > 1:
+        stores = {'/dev/' + entry['APFSPhysicalStore'] for entry in volume_info.get('APFSPhysicalStores', [])
+                  if entry.get('APFSPhysicalStore')}
+        preferred = [(device, candidate) for device, candidate in good if device in stores]
+        if len(preferred) == 1:
+            good = preferred
     if len(good) != 1:
         print(json.dumps(dict(entities=entities, volume=volume_info, candidates=candidates,
                               good=[(d, {k: c.get(k) for k in ('BusProtocol', 'TotalSize', 'Writable', 'DeviceNode')})

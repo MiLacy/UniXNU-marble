@@ -59,7 +59,7 @@ python3 "$DEVICE/scripts/build-owner-volume-policy.py" \
   --unixnu "$UNIXNU" --component systemos \
   --source "$SYSTEMOS_DMG" --mountpoint "$SYSTEMOS_MOUNT" \
   --out "$UNIXNU/build/verified-root-systemos" \
-  --volume-uuid 9071148B-B025-402D-AD7A-48464D8B5FFF \
+  --volume-uuid 8846FE78-2910-4297-AF97-D59BB6F8FC16 \
   --image-sha256 b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f \
   --image-bytes 3303014400 --blocks 806400 \
   --source-sha256 b4908cde41d23e6bc05e6af51a2c9eeb00cf0f863a6a18b1600c96a3fd70414f \
