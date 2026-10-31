@@ -70,9 +70,10 @@ def main():
     print()
     print('Run this only from TWRP/recovery with userdata unmounted:')
     print(f'  adb push {args.image} {args.remote_image}')
-    print(f'  adb shell su -c "dd if={args.remote_image} of={args.block_device} '
+    print(f'  adb shell "dd if={args.remote_image} of={args.block_device} '
           f'bs={BLOCK} seek={SEEK} count={ROOT_BLOCKS} conv=notrunc,fsync"')
-    print(f'  adb shell su -c "sync"')
+    print('  adb shell "sync"')
+    print('  (the helper adds `su -c` only when adb is not already uid 0)')
     print()
 
     if not args.execute:
