@@ -16,7 +16,7 @@ then disappears on the next reset instead of replacing the boot partition.
 
 ## Before you start
 
-1. Back up anything on the phone. `userdata` is overwritten in Stage 3.
+1. Back up anything on the phone anyway. The tail method below writes only the last 2,290,688 blocks of `userdata`; a wrong device, offset or tool can still destroy the partition.
 2. The bootloader must be unlocked; `fastboot boot` refuses a locked device.
 3. Install Android platform tools and confirm `fastboot devices`.
 4. Enter the bootloader:
@@ -223,14 +223,49 @@ clearing `SCTLR`/`CBAR`, and the retry range now covers all 128 context banks.
 The geometry is in `board.toml [userdata]`; `manifest status=1 windows=0`
 means the partition is the Android ext4 userdata, not a `SHNGROOT` image.
 
+## Stage 3 preparation — write the root image to the userdata tail
+
+The root window is the last 2,290,688 4 KiB blocks of `userdata`: absolute LBA
+`59589627` through `61880314`. The GPT userdata entry starts at LBA `3107328`,
+so a `dd` to the **partition device** seeks `59589627 - 3107328 = 56482299`
+blocks. This leaves the Android ext4 data at the start untouched.
+
+Image:
+
+```text
+UniXNU/out/marble/ipados-17.7.11-21H461/marble-root/userdata/userdata-root.img
+size 9,382,658,048 bytes
+SHA-256 fd43ee7035ce185ce4215ac93fdc006fd784a54b3b7442e21457c226cbe03093
+```
+
+Do **not** use `fastboot flash userdata`; it writes from offset 0. Boot
+TWRP/recovery, leave `userdata` unmounted, then dry-run the host helper:
+
+```sh
+cd UniXNU-marble
+python3 scripts/write-userdata-tail.py \
+  ../UniXNU/out/marble/ipados-17.7.11-21H461/marble-root/userdata/userdata-root.img
+```
+
+After checking the printed `dd` command, repeat with `--execute`. The helper:
+
+- requires the image to be exactly 9,382,658,048 bytes;
+- writes only the tail window with `seek=56482299 count=2290688 conv=notrunc`;
+- compares the first userdata block before and after;
+- refuses to continue if that block changed.
+
+The earlier read-only probe recorded the partition as Android ext4 with no
+`SHNGROOT` manifest. A successful tail write makes the manifest visible at
+LBA `59589627` while the ext4 superblock at LBA `3107328` stays intact.
+
 ## Stage 3 — System entry (owner-verified tail root)
 
 **请使用 marble 实机测试：不刷入任何分区，直接 `fastboot boot` 本次镜像，确认
 owner 校验通过、SystemOS cache/union 挂载、`launchd` 启动，并进入 Data seed
 挂载阶段；记录屏幕最后状态与串口日志。**
 
-This boot uses the OS/SystemOS images already written to the userdata tail
-(LBA 59589627, 2,290,688 4K blocks). Nothing is flashed now. The kernel carries
+This boot uses the OS/SystemOS images written to the userdata tail by the
+preparation step above (LBA 59589627, 2,290,688 4K blocks). The kernel carries
 the owner RSA-3072 anchor and the two signed block policies
 (`_verified_root_policies`, policy count 2). The SystemOS cache volume UUID is
 `8846FE78-2910-4297-AF97-D59BB6F8FC16`; the ephemeral Data seed UUID is

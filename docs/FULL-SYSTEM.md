@@ -75,7 +75,11 @@ Then:
 ```
 
 Inspect `userdata-root.json` and confirm the image fits the measured partition
-before flashing.
+before writing. Do **not** run `fastboot flash userdata`: the root image belongs
+at the tail, not at partition offset 0. Use
+[`scripts/write-userdata-tail.py`](scripts/write-userdata-tail.py) from
+TWRP/recovery; it writes only LBA `59589627..61880314` and verifies that the
+Android ext4 first block is unchanged.
 
 ## 2. Data volume
 
@@ -175,8 +179,8 @@ is a source-backed implementation and a device observation.
 1. Console kernel (verified on marble).
 2. UFS register read + GPT + userdata partition (verified on marble; probe
    geometry recorded).
-3. Unverified full UFS root + userdata image (built on host; awaiting the
-   marble test).
+3. Unverified full UFS root + userdata image (built on host, 2026-11-01;
+   awaiting the tail write and marble test).
 4. Verified root + Data seed + launchd.
 5. Display stack + Hello/SpringBoard.
 6. Touch.

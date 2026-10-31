@@ -15,7 +15,7 @@ root and the userland stages remain open.
 | --- | --- | --- |
 | 1. UEFI / UniXNU menu | verified on marble | `UniXNU.efi`, `UniXNUDxe`, `UniXNURamDiskDxe` and `DarwinBoot` are in the 3 MiB marble firmware volume |
 | 2. XNU kernel entry | **device-verified 2026-11-01** | XNU 10063.141.1 console kernel with the SM7475 patches; it reaches `IOKitBSDInit.cpp:984` and stops at the expected missing root device |
-| 3. System entry | built on host, awaiting device test | full UFS root build: the UFS controller, SMMU takeover and `NativeUfsBlock` are linked against the original `IOBlockStorageDevice` ABI, and an 8.8 GiB `OS`/`SystemOS` userdata image is written. The root is **unverified**: no verified-root bundle and no Data seed. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
+| 3. System entry | tail-root image built; device write pending | unverified UFS root: `NativeUfsBlock` reads OS/SystemOS from LBA `59589627..61880314`; the 8.7 GiB image is written to the userdata tail without touching Android ext4 data. No verified-root bundle or Data seed. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
 
 **Please test on a real marble at every stage.** The exact prompts, commands
 and observations to capture are in [REAL-DEVICE-TESTS.md](docs/REAL-DEVICE-TESTS.md).
@@ -59,12 +59,32 @@ trust cache are enough.
 
 The image passes `cpus=1` and disables UFS root arguments for the first entry.
 The complete bundle, including the FD and ADT, is in
-`artifacts/marble-xnu-console/` in the workspace; see its README. The build is
-host-only: `hardware_tested` is false until the phone is booted.
+`artifacts/marble-xnu-console/` in the workspace; see its README.
 
 ```sh
 fastboot boot artifacts/marble-xnu-console/boot.img
 ```
+
+## UFS tail root (host-built, unverified)
+
+[`configs/marble-root_defconfig`](configs/marble-root_defconfig) enables the
+UFS block driver and reads the root image from the **tail** of `userdata`
+(LBA `59589627`, `2290688` blocks). Android ext4 data at the start of the
+partition is left alone; the image is written with
+[`scripts/write-userdata-tail.py`](scripts/write-userdata-tail.py), not with
+`fastboot flash userdata`.
+
+| Artifact | Size | SHA-256 |
+| --- | --- | --- |
+| `boot.img` | 169,607,168 | `b233202c997839648756d005a9d6063a401106d19fd9a7fbb62f826169ba1407` |
+| `payload.img` | 167,772,160 | `992815d556aa6bf51104bf17c3cf8d010eac478ef4dba8ca95ec0f27440002f6` |
+| root `kernel.macho` | 51,146,752 | `ac94dde29edd3f491a71f7339e0a1d1b947e97bc2b574c372742f3d8ede7910c` |
+| `userdata-root.img` | 9,382,658,048 | `fd43ee7035ce185ce4215ac93fdc006fd784a54b3b7442e21457c226cbe03093` |
+
+The root is **unverified**: the payload passes `native-ufs-allow-unverified=1`
+and `root-unverified=1`. There is no Data seed, so `/private/var` may still
+block launchd. The image is in
+`out/marble/ipados-17.7.11-21H461/marble-root/userdata/`.
 
 ## Hardware summary
 

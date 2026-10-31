@@ -12,10 +12,16 @@ spelling; without this, `interrupt-parent` resolves to NULL and
 `IODTGetICellCounts` data-aborts at FAR 0. This was observed on marble at PC
 `0xfffffff0078ec634`, ESR `0x96000005`.
 
+`0003-unverified-native-ufs.patch` lets `build-arm-driver.py` compile
+`NativeUfs` without `NATIVE_VERIFIED_BLOCK` when `XNU_VERIFIED_ROOT_PROBE=0`.
+The resulting driver still requires `native-ufs-allow-unverified=1` and
+`root-unverified=1`; it is only for the first tail-root bring-up.
+
 ```sh
 cd ../UniXNU
 git apply ../UniXNU-marble/patches/unixnu/0001-bootimg-existing-dtb-node.patch
 git apply ../UniXNU-marble/patches/unixnu/0002-adt-aapl-phandle.patch
+git apply ../UniXNU-marble/patches/unixnu/0003-unverified-native-ufs.patch
 ```
 
 The patch was tested against the UniXNU checkout used for the 2026-11-01
