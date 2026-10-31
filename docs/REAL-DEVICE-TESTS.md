@@ -107,25 +107,41 @@ Inputs required (not in this repository):
 
 Build:
 
-The host build already produced `boot.img` with the kernel, ADT and the two
-original 21H461 trust modules. To rebuild it:
+The 2026-11-01 console image is already built. Boot it directly:
+
+```sh
+fastboot devices
+fastboot boot artifacts/marble-xnu-console/boot.img
+```
+
+Its SHA-256 is
+`4c44a4ed1ba286b2ed5bac421ce2903a52b9c2c23794cfe42b6bc5fd51bc5cb8`.
+It uses `configs/marble-console_defconfig`, `cpus=1`, no UFS root, no Data
+seed and no verified-root policy.
+
+To rebuild it:
 
 ```sh
 cd ../UniXNU
-./unixnu build kernel -D ../UniXNU-marble
-./unixnu ipsw fetch -D ../UniXNU-marble StaticTrustCache Cryptex1,SystemTrustCache
-python3 out/marble/ipados-17.7.11-21H461/marble/tree/scripts/make-marble-trust.py
-./unixnu build payload -D ../UniXNU-marble \
-  --uefi ../uefi-marble \
+./unixnu defconfig marble-console_defconfig -D ../UniXNU-marble
+./unixnu tree -D ../UniXNU-marble
+./unixnu build kernel -D ../UniXNU-marble \
+  --ipsw ../iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw
+./unixnu build payload -D ../UniXNU-marble --uefi ../uefi-marble \
+  --kernel out/marble/ipados-17.7.11-21H461/marble-console/kernel/kernel.macho \
   --trust-cache out/marble/ipados-17.7.11-21H461/marble/tree/build/marble-trust.bundle \
-  --unique-chip-id 4d4152424c45
-./unixnu bootimg -D ../UniXNU-marble \
-  --uefi ../uefi-marble \
+  --unique-chip-id 4d4152424c45 \
+  --kernel-arg cpus=1 \
+  --kernel-arg native-ufs-root=0 --kernel-arg native-ufs-stream=0 \
+  --kernel-arg native-ufs-smmu-takeover=0 \
+  --kernel-arg native-ufs-root-lba=0 --kernel-arg native-ufs-root-blocks=0
+./unixnu bootimg -D ../UniXNU-marble --uefi ../uefi-marble \
+  --fd ../uefi-marble/Build/marblePkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd \
   --dtb ../uefi-marble/Resources/DTBs/marble-unixnu.dtb
-fastboot boot out/marble/ipados-17.7.11-21H461/marble/boot/boot.img
+fastboot boot out/marble/ipados-17.7.11-21H461/marble-console/boot/boot.img
 ```
 
-The Stage 2 result recorded with the first-console image was
+The earlier Stage 2 result was
 `c615520c88e79e78d170bc1309b132a3f4465017cab46ae8f5bfd887cc2931b9`. The
 full-root `boot.img` (`ce8b5f6e...`) and the trust bundle were produced by the
 previous workspace and are not part of this checkout. Rebuild them from the

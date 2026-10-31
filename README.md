@@ -14,7 +14,7 @@ every stage below must be verified on a physical marble.
 | Stage | State | What runs |
 | --- | --- | --- |
 | 1. UEFI / UniXNU menu | verified on marble | `UniXNU.efi`, `UniXNUDxe`, `UniXNURamDiskDxe` and `DarwinBoot` are in the 3 MiB marble firmware volume |
-| 2. XNU kernel entry | verified on marble | XNU 10063.141.1 with the SM7475 SMP/cluster patches; payload carries the kernel, ADT and the two original trust caches |
+| 2. XNU kernel entry | host-built console image; previous hardware result | XNU 10063.141.1 console kernel with the SM7475 patches; payload carries the kernel, ADT and the two original trust caches |
 | 3. System entry | built on host, awaiting device test | full UFS root build: the UFS controller, SMMU takeover and `NativeUfsBlock` are linked against the original `IOBlockStorageDevice` ABI, and an 8.8 GiB `OS`/`SystemOS` userdata image is written. The root is **unverified**: no verified-root bundle and no Data seed. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
 
 **Please test on a real marble at every stage.** The exact prompts, commands
@@ -40,6 +40,31 @@ in [docs/BUILD-2026-11-01.md](docs/BUILD-2026-11-01.md). The earlier full-root
 `boot.img`, `kernel.macho`, trust bundle and 8.8 GiB `userdata-root.img`
 were produced by the previous workspace and are **not** part of this
 checkout. Rebuild them with the external inputs listed below.
+
+## XNU first-entry image (2026-11-01)
+
+The first-entry console build uses
+[`configs/marble-console_defconfig`](configs/marble-console_defconfig): platform
+expert, CPU/GIC, timer, PMGR and the XNU framebuffer console only. It disables
+UFS, verified root, Data and the display stack, so the exact 21H461 IPSW and a
+trust cache are enough.
+
+| Artifact | Size | SHA-256 |
+| --- | --- | --- |
+| `boot.img` | 169,607,168 | `4c44a4ed1ba286b2ed5bac421ce2903a52b9c2c23794cfe42b6bc5fd51bc5cb8` |
+| `payload.img` | 167,772,160 | `3d18a9f2f5b3a45213d4a33af17035cf9dd06464a4edea3f937effd5ddf63068` |
+| console `kernel.macho` | 51,073,024 | `5270a0b93bea8db7de01f56440f8142430df4395954bf18335f8f5806c32e6df` |
+| patched payload kernel | 51,073,024 | `87d112816c1aeaea046510bcfa210de4cbc72d3696cef1fcef0f0077f83679a5` |
+| trust cache | 61,356 | `7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7` |
+
+The image passes `cpus=1` and disables UFS root arguments for the first entry.
+The complete bundle, including the FD and ADT, is in
+`artifacts/marble-xnu-console/` in the workspace; see its README. The build is
+host-only: `hardware_tested` is false until the phone is booted.
+
+```sh
+fastboot boot artifacts/marble-xnu-console/boot.img
+```
 
 ## Hardware summary
 
@@ -117,7 +142,29 @@ Firmware and the first boot image:
 The empty-ramdisk image boots the firmware and the UniXNU menu. It is the
 Stage 1 test.
 
-Kernel and payload (external inputs required):
+Kernel and payload for first entry (IPSW and trust cache required):
+
+```sh
+./unixnu defconfig marble-console_defconfig -D ../UniXNU-marble
+./unixnu tree -D ../UniXNU-marble
+./unixnu build kernel -D ../UniXNU-marble \
+  --ipsw ../iPad_Pro_HFR_17.7.11_21H461_Restore.ipsw
+
+./unixnu build payload -D ../UniXNU-marble --uefi ../uefi-marble \
+  --kernel out/marble/ipados-17.7.11-21H461/marble-console/kernel/kernel.macho \
+  --trust-cache out/marble/ipados-17.7.11-21H461/marble/tree/build/marble-trust.bundle \
+  --unique-chip-id 4d4152424c45 \
+  --kernel-arg cpus=1 \
+  --kernel-arg native-ufs-root=0 --kernel-arg native-ufs-stream=0 \
+  --kernel-arg native-ufs-smmu-takeover=0 \
+  --kernel-arg native-ufs-root-lba=0 --kernel-arg native-ufs-root-blocks=0
+
+./unixnu bootimg -D ../UniXNU-marble --uefi ../uefi-marble \
+  --fd ../uefi-marble/Build/marblePkg/DEBUG_CLANGPDB/FV/SILICIUM_UEFI.fd \
+  --dtb ../uefi-marble/Resources/DTBs/marble-unixnu.dtb
+```
+
+Full UFS root kernel and payload (external inputs and verified-root bundle required):
 
 ```sh
 # kernel: XNU source fetch and Linux/macOS toolchain
