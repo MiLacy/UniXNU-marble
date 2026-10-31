@@ -15,6 +15,8 @@ extern "C" void boot_progress_stage(const char *message);
 extern "C" uint64_t marble_display_calls;
 extern "C" uint64_t marble_display_started;
 extern "C" uint64_t marble_display_init;
+extern "C" uint64_t marble_display_base;
+extern "C" uint64_t marble_display_self;
 extern "C" uint32_t marble_display_last;
 extern "C" uint32_t marble_display_counts[262];
 
@@ -833,11 +835,15 @@ MarbleDisplay::unclassified261()
 extern "C" uint64_t marble_display_calls;
 extern "C" uint64_t marble_display_started;
 extern "C" uint64_t marble_display_init;
+extern "C" uint64_t marble_display_base;
+extern "C" uint64_t marble_display_self;
 extern "C" uint32_t marble_display_last;
 extern "C" uint32_t marble_display_counts[262];
 uint64_t marble_display_calls;
 uint64_t marble_display_started;
 uint64_t marble_display_init;
+uint64_t marble_display_base;
+uint64_t marble_display_self;
 uint32_t marble_display_last;
 uint32_t marble_display_counts[262];
 
@@ -852,18 +858,24 @@ native_mobile_display_provider_probe(void)
 extern "C" void
 marble_display_late_start(void)
 {
-	static int done = 0;
-	if (done) {
-		return;
+	static int attempted = 0, instanced = 0;
+	const OSMetaClass *base = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("IOMobileFramebuffer"));
+	marble_display_base = base ? 1 : 0;
+	if (!attempted) {
+		attempted = 1;
+		marble_marble_ctor();
 	}
-	done = 1;
-	marble_marble_ctor();
-	marble_display_init = 1;
 	const OSMetaClass *mc = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("MarbleDisplay"));
+	marble_display_self = mc ? 1 : 0;
+	marble_display_init = 1;
 	if (mc == nullptr) {
-		marble_display_started = 2;
+		marble_display_started = (base != nullptr) ? 2 : 9;
 		return;
 	}
+	if (instanced) {
+		return;
+	}
+	instanced = 1;
 	IORegistryEntry *entry = IORegistryEntry::fromPath("/arm-io/disp0", gIODTPlane);
 	if (entry == nullptr) {
 		marble_display_started = 3;

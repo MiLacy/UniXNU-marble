@@ -47,6 +47,10 @@ __attribute__((weak)) uint32_t marble_display_last;
 __attribute__((weak)) uint32_t marble_display_counts[262];
 __attribute__((weak)) uint64_t marble_display_started;
 __attribute__((weak)) uint64_t marble_display_init;
+__attribute__((weak)) uint64_t marble_display_base;
+__attribute__((weak)) uint64_t marble_display_self;
+extern void marble_display_late_start(void);
+static uint64_t mDisplayRetry;
 extern volatile uint32_t armcpu_smp_fail[8];
 extern volatile uint32_t armcpu_smp_step[8];
 extern volatile uint32_t armcpu_core_timer[8];
@@ -249,10 +253,15 @@ bp_beat (void)
 	}
 	mLastBeat = now;
 	mBeat++;
+	if (marble_display_init && (!marble_display_self || marble_display_started >= 2) && mDisplayRetry < 40 &&
+	    (!mDisplayRetry || now - mDisplayRetry >= mBeatInterval * 3)) {
+		mDisplayRetry++;
+		marble_display_late_start ();
+	}
 	bp_header ();
 	{
 		unsigned scale = 2, cell = 6 * scale, line = 14 * scale, y = mHeight / 100 + 8;
-		bp_fill (0, y, mWidth, 3 * line, 0xFF000000u);
+		bp_fill (0, y, mWidth, 5 * line, 0xFF000000u);
 		unsigned col = 0;
 		const char *head = "CORES step ";
 		for (const char *c = head; *c; c++, col++) {
@@ -284,6 +293,17 @@ bp_beat (void)
 			while (n) { bp_glyph_s (col * cell, y + 2 * line, digits[--n], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
 			bp_glyph_s (col * cell, y + 2 * line, i == 7 ? ' ' : ',', 0xFFFFFFFFu, 0xFF000000u, scale); col++;
 		}
+		col = 0;
+		const char *head4 = "CLS base=";
+		for (const char *c = head4; *c; c++, col++) {
+			bp_glyph_s (col * cell, y + 3 * line, *c, 0xFFFFFFFFu, 0xFF000000u, scale);
+		}
+		bp_glyph_s (col * cell, y + 3 * line, marble_display_base ? '1' : '0', 0xFFFFFFFFu, 0xFF000000u, scale); col += 6;
+		const char *head5 = "self=";
+		for (const char *c = head5; *c; c++, col++) {
+			bp_glyph_s (col * cell, y + 3 * line, *c, 0xFFFFFFFFu, 0xFF000000u, scale);
+		}
+		bp_glyph_s (col * cell, y + 3 * line, marble_display_self ? '1' : '0', 0xFFFFFFFFu, 0xFF000000u, scale);
 	}
 	bp_unlock ();
 }
@@ -310,7 +330,7 @@ boot_progress_bind (uintptr_t base, unsigned width, unsigned height, unsigned ro
 	mHeight = height;
 	mRowBytes = rowbytes;
 	mCols = width / BP_CELL;
-	mHeaderY = mHeight * 6 / 100;
+	mHeaderY = mHeight * 9 / 100;
 	mStatusY = mHeaderY + BP_LINE;
 	mLogY = mStatusY + BP_LINE;
 	mX = 0;
