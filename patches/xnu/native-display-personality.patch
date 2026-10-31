@@ -8,7 +8,7 @@
 +    "   ,{"
 +    "     'IOClass'         = MarbleDisplay;"
 +    "     'IOProviderClass' = IOPlatformDevice;"
-+    "     'IONameMatch'     = 'disp0';"
++    "     'IOPropertyMatch' = { 'device_type' = 'display-subsystem'; };"
 +    "     'IOProbeScore'    = 1000:32;"
 +    "   }"
 +#endif

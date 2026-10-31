@@ -9,6 +9,7 @@ extern "C" void boot_progress_stage(const char *message);
 
 extern "C" uint64_t marble_display_calls;
 extern "C" uint64_t marble_display_started;
+extern "C" uint64_t marble_display_init;
 extern "C" uint32_t marble_display_last;
 extern "C" uint32_t marble_display_counts[262];
 
@@ -24,6 +25,7 @@ static void marble_slot(uint32_t slot)
 class MarbleDisplay : public IOMobileFramebuffer {
 	OSDeclareDefaultStructors(MarbleDisplay)
 public:
+	bool init(OSDictionary *properties = nullptr) APPLE_KEXT_OVERRIDE;
 	bool start(IOService *provider) APPLE_KEXT_OVERRIDE;
 	IOReturn beforeExternalMethod() APPLE_KEXT_OVERRIDE;
 	IOReturn releaseClientState(IOUserClient *client) APPLE_KEXT_OVERRIDE;
@@ -122,6 +124,16 @@ public:
 };
 
 OSDefineMetaClassAndStructors(MarbleDisplay, IOMobileFramebuffer)
+
+bool
+MarbleDisplay::init(OSDictionary *properties)
+{
+	if (!IOService::init(properties)) {
+		return false;
+	}
+	__atomic_fetch_add(&marble_display_init, 1, __ATOMIC_RELAXED);
+	return true;
+}
 
 bool
 MarbleDisplay::start(IOService *provider)
@@ -815,10 +827,12 @@ MarbleDisplay::unclassified261()
 
 extern "C" uint64_t marble_display_calls;
 extern "C" uint64_t marble_display_started;
+extern "C" uint64_t marble_display_init;
 extern "C" uint32_t marble_display_last;
 extern "C" uint32_t marble_display_counts[262];
 uint64_t marble_display_calls;
 uint64_t marble_display_started;
+uint64_t marble_display_init;
 uint32_t marble_display_last;
 uint32_t marble_display_counts[262];
 
