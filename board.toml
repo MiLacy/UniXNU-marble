@@ -109,6 +109,13 @@ kernel_args = ["-v", "serial=3", "debug=0x14e", "cpus=8", "native-ufs-stream=0xe
 [adt.defaults.u32]
 vmm-present = 1
 
+# Development boot-set identity for the unverified tail root. launchd's
+# mount -P 1 needs a 48-byte /chosen/boot-manifest-hash; without a verified-root
+# bundle there is no owner manifest to publish. This is an opaque bring-up
+# identity (SHA-384 of the domain string), not an Apple or owner signature.
+[adt.chosen.bytes]
+boot-manifest-hash = "ccdc24fc882151416af5794568f0f32f7b3878572e6c8b3520b0690763ef6bb63a34c055f783af09d38ecd1c679196c6"
+
 [payload.adt]
 chip_id = "207"
 owned_memory_size = "0x100000000"

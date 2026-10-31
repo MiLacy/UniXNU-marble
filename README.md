@@ -15,7 +15,7 @@ root and the userland stages remain open.
 | --- | --- | --- |
 | 1. UEFI / UniXNU menu | verified on marble | `UniXNU.efi`, `UniXNUDxe`, `UniXNURamDiskDxe` and `DarwinBoot` are in the 3 MiB marble firmware volume |
 | 2. XNU kernel entry | **device-verified 2026-11-01** | XNU 10063.141.1 console kernel with the SM7475 patches; it reaches `IOKitBSDInit.cpp:984` and stops at the expected missing root device |
-| 3. System entry | **device-verified root + launchd; boot manifest pending** | unverified UFS root: `NativeUfsBlock` reads OS/SystemOS from LBA `59589627..61880314`; the SystemOS union supplies `libSystem` and launchd starts. launchd then spawns `/sbin/mount` (PID 3), which exits 66 because no boot-manifest-hash is published. No verified-root bundle or Data seed. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
+| 3. System entry | **device-verified root + launchd; mount retest pending** | unverified UFS root: `NativeUfsBlock` reads OS/SystemOS from LBA `59589627..61880314`; the SystemOS union supplies `libSystem` and launchd starts. launchd then spawns `/sbin/mount` (PID 3), which exits 66 because no boot-manifest-hash is published. No verified-root bundle or Data seed. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
 
 **Please test on a real marble at every stage.** The exact prompts, commands
 and observations to capture are in [REAL-DEVICE-TESTS.md](docs/REAL-DEVICE-TESTS.md).
@@ -76,8 +76,8 @@ partition is left alone; the image is written with
 
 | Artifact | Size | SHA-256 |
 | --- | --- | --- |
-| `boot.img` | 169,607,168 | `6ac2fc9ea3e0f9930d8d9170a716bf2ad8cda062c8687437460a4ef40365d9aa` |
-| `payload.img` | 167,772,160 | `ce0e033212ce719f2c42aa0f1b859c9932b77e11b60fcc4bdb3723e1ff06db1f` |
+| `boot.img` | 169,607,168 | `ce31ab2fa3a8bdf7109ce59c0dc6f653e3fcf05d776b869450c1142538caa611` |
+| `payload.img` | 167,772,160 | `531158dfcc33aed5797ad3bbd9f5c74d4fb16236de39c4bb562f5bee7047a2db` |
 | root `kernel.macho` | 51,146,752 | `b1ae430bf1105e433f780ae88c762ddfcb2ab39d96963da4a98ae174f6105918` |
 | `userdata-root.img` | 9,382,658,048 | `fd43ee7035ce185ce4215ac93fdc006fd784a54b3b7442e21457c226cbe03093` |
 
@@ -96,7 +96,10 @@ mount[3] exited -- no exit reason available -- (signal 0, exit status 66)
 
 This is the known **missing `boot-manifest-hash`** checkpoint, not a Data
 failure: `CONFIG_XNU_OWNER_BOOT_MANIFEST` is off and no verified-root policy is
-present. The image is in
+present. The current board image adds a development-only 48-byte
+`/chosen/boot-manifest-hash` (SHA-384 of `MarbleBringup.BootSet.v1\0`) so the
+mount phase can read an image-set identity. This is not an owner signature.
+The image is in
 `out/marble/ipados-17.7.11-21H461/marble-root/userdata/`.
 
 ## Hardware summary

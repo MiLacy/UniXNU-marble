@@ -295,6 +295,12 @@ policy. Enabling `XNU_OWNER_BOOT_MANIFEST` needs the owner-signed manifest and
 `native_verified_block_manifest_sha384`; the next step is the macOS
 verified-root bundle, not a data-only change.
 
+For the immediate unverified retest, `board.toml` publishes a development-only
+48-byte `/chosen/boot-manifest-hash` through `[adt.chosen.bytes]`. It is the
+SHA-384 of `MarbleBringup.BootSet.v1\0`, not an Apple/owner signature. The
+resulting `boot.img` is `ce31ab2f...`; use it to check whether mount phase 1
+passes and what the next userland checkpoint is.
+
 ## Stage 3 — System entry (owner-verified tail root)
 
 **请使用 marble 实机测试：不刷入任何分区，直接 `fastboot boot` 本次镜像，确认
