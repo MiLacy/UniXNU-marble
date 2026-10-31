@@ -41,7 +41,7 @@ extern uint64_t sweet_fb_swap_count;
 extern uint64_t sweet_fb_started;
 extern uint64_t sweet_fb_clients;
 extern volatile int sheng_launch_policy_status;
-static unsigned mStatusY;
+static unsigned mStatusY, mWhyY;
 extern volatile uint64_t native_ufs_verified_blocks;
 
 static int
@@ -343,6 +343,7 @@ boot_progress_bind (uintptr_t base, unsigned width, unsigned height, unsigned ro
 	mCols = width / BP_CELL;
 	mBarY = mHeight * 12 / 100;
 	mStatusY = mBarY + 92;
+	mWhyY = mStatusY + BP_LINE;
 	mHeaderY = mHeight * 20 / 100;
 	mLogY = mHeaderY + BP_LINE;
 	mX = 0;
@@ -465,6 +466,31 @@ boot_progress_exit (int pid, const char *name, int status, unsigned ns, uint64_t
 	bp_text (" code ");
 	bp_number (code, 16);
 	bp_emit ('\n');
+	bp_unlock ();
+}
+
+void
+boot_progress_exit_reason (const char *name, const char *reason)
+{
+	unsigned saved_x, saved_y, used = 0;
+
+	if (!mReady || !reason || !*reason || !bp_lock ()) {
+		return;
+	}
+	saved_x = mX;
+	saved_y = mY;
+	bp_fill (0, mWhyY, mWidth, BP_LINE, 0xFF000000u);
+	mX = 0;
+	mY = mWhyY;
+	bp_text (name ? name : "?");
+	bp_text (": ");
+	for (const char *c = reason; *c && used < 44; c++) {
+		char ch = (*c >= 32 && *c <= 126) ? *c : ' ';
+		bp_emit (ch);
+		used++;
+	}
+	mX = saved_x;
+	mY = saved_y;
 	bp_unlock ();
 }
 
