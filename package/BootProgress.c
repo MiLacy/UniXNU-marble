@@ -17,6 +17,10 @@
 #define BP_SCALE 3
 #define BP_CELL  (6 * BP_SCALE)
 #define BP_LINE  (14 * BP_SCALE)
+#define BP_LOGO_SCALE 7
+#define BP_PROGRESS_TOTAL 2290185ULL
+
+static unsigned mLogY, mHeaderY, mBarY;
 
 static const uint64_t mFont[] = GLYPH_FONT;
 
@@ -62,7 +66,7 @@ bp_fill (unsigned x, unsigned y, unsigned w, unsigned h, uint32_t color)
 }
 
 static void
-bp_glyph (unsigned x, unsigned y, char c, uint32_t fg, uint32_t bg)
+bp_glyph_s (unsigned x, unsigned y, char c, uint32_t fg, uint32_t bg, unsigned scale)
 {
 	uint64_t glyph;
 	unsigned top, bottom;
@@ -73,25 +77,72 @@ bp_glyph (unsigned x, unsigned y, char c, uint32_t fg, uint32_t bg)
 	glyph = mFont[c - 32];
 	top = (unsigned)(glyph >> 32);
 	bottom = (unsigned)glyph;
-	for (unsigned row = 0; row < 14 * BP_SCALE; row++) {
+	for (unsigned row = 0; row < 14 * scale; row++) {
 		uint32_t *line = (uint32_t *)(mBase + (size_t)(y + row) * mRowBytes);
-		for (unsigned col = 0; col < BP_CELL; col++) {
-			line[x + col] = bg;
+		for (unsigned col = 0; col < 6 * scale; col++) {
+			if (x + col < mWidth) {
+				line[x + col] = bg;
+			}
 		}
 	}
 	for (unsigned row = 0; row < 12; row++) {
 		unsigned data = (row < 6) ? (top >> (row * 5)) : (bottom >> ((row - 6) * 5));
 		for (unsigned col = 0; col < 5; col++) {
 			if ((data >> col) & 1) {
-				for (unsigned dy = 0; dy < BP_SCALE; dy++) {
-					uint32_t *line = (uint32_t *)(mBase + (size_t)(y + row * BP_SCALE + dy) * mRowBytes);
-					for (unsigned dx = 0; dx < BP_SCALE; dx++) {
-						line[x + col * BP_SCALE + dx] = fg;
+				for (unsigned dy = 0; dy < scale; dy++) {
+					if (y + row * scale + dy >= mHeight) {
+						continue;
+					}
+					uint32_t *line = (uint32_t *)(mBase + (size_t)(y + row * scale + dy) * mRowBytes);
+					for (unsigned dx = 0; dx < scale; dx++) {
+						if (x + col * scale + dx < mWidth) {
+							line[x + col * scale + dx] = fg;
+						}
 					}
 				}
 			}
 		}
 	}
+}
+
+static void
+bp_glyph (unsigned x, unsigned y, char c, uint32_t fg, uint32_t bg)
+{
+	bp_glyph_s (x, y, c, fg, bg, BP_SCALE);
+}
+
+static void
+bp_text_at (unsigned x, unsigned y, unsigned scale, const char *s, uint32_t fg)
+{
+	while (*s) {
+		bp_glyph_s (x, y, *s++, fg, 0xFF000000u, scale);
+		x += 6 * scale;
+	}
+}
+
+static void
+bp_text_centered (unsigned y, unsigned scale, const char *s)
+{
+	unsigned width = (unsigned)strlen (s) * 6 * scale;
+	unsigned x = width < mWidth ? (mWidth - width) / 2 : 0;
+
+	bp_text_at (x, y, scale, s, 0xFFFFFFFFu);
+}
+
+static void
+bp_number_string (char *out, uint64_t value)
+{
+	char digits[24];
+	unsigned n = 0, i = 0;
+
+	do {
+		digits[n++] = (char)('0' + value % 10);
+		value /= 10;
+	} while (value && n < sizeof (digits));
+	while (n) {
+		out[i++] = digits[--n];
+	}
+	out[i] = 0;
 }
 
 static void
@@ -118,9 +169,9 @@ bp_emit (char c)
 		return;
 	}
 	if (mY + BP_LINE > mHeight) {
-		size_t bytes = (size_t)(mHeight - 2 * BP_LINE) * mRowBytes;
-		memmove ((void *)mBase + BP_LINE * mRowBytes,
-		    (const void *)mBase + 2 * BP_LINE * mRowBytes, bytes);
+		size_t bytes = (size_t)(mHeight - mLogY - BP_LINE) * mRowBytes;
+		memmove ((void *)mBase + mLogY * mRowBytes,
+		    (const void *)mBase + (mLogY + BP_LINE) * mRowBytes, bytes);
 		bp_fill (0, mHeight - BP_LINE, mWidth, BP_LINE, 0xFF000000u);
 		mY = mHeight - BP_LINE;
 	}
@@ -150,6 +201,62 @@ bp_number (uint64_t value, unsigned base)
 	}
 }
 
+static unsigned
+bp_progress (void)
+{
+	uint64_t verified = native_ufs_verified_blocks;
+
+	if (verified >= BP_PROGRESS_TOTAL) {
+		return 100;
+	}
+	return (unsigned)((verified * 100) / BP_PROGRESS_TOTAL);
+}
+
+static void
+bp_bar (void)
+{
+	unsigned x0 = mWidth / 8, w = mWidth * 3 / 4, y = mBarY, pct = bp_progress ();
+	unsigned fill = (w - 8) * pct / 100;
+	char text[8];
+
+	bp_fill (x0, y, w, 4, 0xFFFFFFFFu);
+	bp_fill (x0, y + 24, w, 4, 0xFFFFFFFFu);
+	bp_fill (x0, y, 4, 28, 0xFFFFFFFFu);
+	bp_fill (x0 + w - 4, y, 4, 28, 0xFFFFFFFFu);
+	bp_fill (x0 + 4, y + 4, w - 8, 20, 0xFF000000u);
+	if (fill) {
+		bp_fill (x0 + 4, y + 4, fill, 20, 0xFFFFFFFFu);
+	}
+	bp_number_string (text, pct);
+	{
+		char line[16];
+		unsigned i = 0;
+		while (text[i]) {
+			line[i] = text[i];
+			i++;
+		}
+		line[i++] = '%';
+		line[i] = 0;
+		bp_text_centered (y + 36, BP_SCALE, line);
+	}
+}
+
+static void
+bp_splash (void)
+{
+	const char *logo = "UniXNU";
+	unsigned scale = BP_LOGO_SCALE;
+	unsigned width = (unsigned)strlen (logo) * 6 * scale;
+	unsigned x = width < mWidth ? (mWidth - width) / 2 : 0;
+	unsigned y = mHeight / 24;
+
+	for (const char *c = logo; *c; ++c) {
+		bp_glyph_s (x, y, *c, 0xFFFFFFFFu, 0xFF000000u, scale);
+		x += 6 * scale;
+	}
+	bp_text_centered (y + 14 * scale + 16, BP_SCALE, "marble - iPadOS bring-up");
+}
+
 static void
 bp_header (void)
 {
@@ -162,9 +269,10 @@ bp_header (void)
 		absolutetime_to_nanoseconds (mach_absolute_time () - mStart, &ns);
 		seconds = (unsigned)(ns / NSEC_PER_SEC);
 	}
-	bp_fill (0, 0, mWidth, BP_LINE, 0xFF000000u);
+	bp_bar ();
+	bp_fill (0, mHeaderY, mWidth, BP_LINE, 0xFF000000u);
 	mX = 0;
-	mY = 0;
+	mY = mHeaderY;
 	bp_text ("ALIVE ");
 	bp_number (seconds, 10);
 	bp_text ("s ");
@@ -220,11 +328,15 @@ boot_progress_bind (uintptr_t base, unsigned width, unsigned height, unsigned ro
 	mHeight = height;
 	mRowBytes = rowbytes;
 	mCols = width / BP_CELL;
+	mBarY = mHeight * 12 / 100;
+	mHeaderY = mHeight * 20 / 100;
+	mLogY = mHeaderY + BP_LINE;
 	mX = 0;
-	mY = 0;
+	mY = mLogY;
 	mReady = 1;
 	if (bp_lock ()) {
 		bp_fill (0, 0, mWidth, mHeight, 0xFF000000u);
+		bp_splash ();
 		bp_header ();
 		bp_text ("MARBLE XNU BOOT\n");
 		bp_unlock ();
