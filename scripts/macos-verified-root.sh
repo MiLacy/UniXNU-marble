@@ -69,9 +69,21 @@ echo "== Data seed: 32 MiB APFS base from the OS initial var tree"
 python3 "$UNIXNU/scripts/prepare-owner-data-fixture.py" \
   --output "$UNIXNU/build/owner-data-fixture"
 
+echo "== Data seed: pack the raw 32 MiB APFS base"
+python3 - "$UNIXNU" \
+  "$UNIXNU/build/owner-data-fixture/owner-data-32.cdr" \
+  "$UNIXNU/build/owner-data-fixture/owner-data-32.dbr" <<'PY'
+import sys
+from pathlib import Path
+root, raw, packed = (Path(value) for value in sys.argv[1:])
+sys.path.insert(0, str(root / 'drivers/DarwinBoot/Test'))
+import packed_ramdisk
+print(packed_ramdisk.pack(raw, packed))
+PY
+
 echo "== Data seed: grow to 3 GiB logical (ephemeral packed seed)"
 python3 "$UNIXNU/scripts/seed-data-grow.py" --gib 3 \
-  "$UNIXNU/build/owner-data-fixture/owner-data-32.cdr" \
+  "$UNIXNU/build/owner-data-fixture/owner-data-32.dbr" \
   "$UNIXNU/build/data-3g.dbr"
 
 echo "== collect artifacts"
