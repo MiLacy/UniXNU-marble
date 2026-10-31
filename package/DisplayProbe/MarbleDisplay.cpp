@@ -8,6 +8,7 @@
 #include <IOKit/IODeviceTreeSupport.h>
 #include <libkern/c++/OSSymbol.h>
 #include <libkern/c++/OSMetaClass.h>
+#include <libkern/c++/OSKext.h>
 
 extern "C" void marble_marble_ctor(void) asm("__GLOBAL__sub_I_MarbleDisplay.cpp");
 extern "C" void boot_progress_stage(const char *message);
@@ -17,6 +18,7 @@ extern "C" uint64_t marble_display_started;
 extern "C" uint64_t marble_display_init;
 extern "C" uint64_t marble_display_base;
 extern "C" uint64_t marble_display_self;
+extern "C" uint64_t marble_display_kext;
 extern "C" uint32_t marble_display_last;
 extern "C" uint32_t marble_display_counts[262];
 
@@ -837,6 +839,7 @@ extern "C" uint64_t marble_display_started;
 extern "C" uint64_t marble_display_init;
 extern "C" uint64_t marble_display_base;
 extern "C" uint64_t marble_display_self;
+extern "C" uint64_t marble_display_kext;
 extern "C" uint32_t marble_display_last;
 extern "C" uint32_t marble_display_counts[262];
 uint64_t marble_display_calls;
@@ -844,6 +847,7 @@ uint64_t marble_display_started;
 uint64_t marble_display_init;
 uint64_t marble_display_base;
 uint64_t marble_display_self;
+uint64_t marble_display_kext;
 uint32_t marble_display_last;
 uint32_t marble_display_counts[262];
 
@@ -858,7 +862,12 @@ native_mobile_display_provider_probe(void)
 extern "C" void
 marble_display_late_start(void)
 {
-	static int attempted = 0, instanced = 0;
+	static int attempted = 0, instanced = 0, kext_tried = 0;
+	if (!kext_tried) {
+		kext_tried = 1;
+		OSReturn loaded = OSKext::loadKextWithIdentifier("com.apple.iokit.IOMobileGraphicsFamily", false);
+		marble_display_kext = (loaded == kOSReturnSuccess) ? 1 : (uint64_t)(0x100 | (loaded & 0xff));
+	}
 	const OSMetaClass *base = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("IOMobileFramebuffer"));
 	marble_display_base = base ? 1 : 0;
 	if (!attempted) {
