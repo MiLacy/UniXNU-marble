@@ -22,6 +22,8 @@ include = [
   "XnuPrelink",
   "DarwinBoot",
   "QcomGeniSpi",
+  "VirtioMmioBlock",
+  "RamBlock",
 ]
 
 [kernel]
@@ -37,6 +39,11 @@ archives = [
   "component:ShengUfs",
   "build-storage-bindings.py",
   "component:VirtioMmioBlock",
+  "storage-bindings.py --component NativeVirtioBlock --archive libVirtioMmioBlock.a --directory build/virtio-mmio-block --subset",
+  "build-arm-driver.py NativeVirtioBlock --verified-root --verified-root-bundle",
+  "storage-bindings.py --component NativeVirtioBlock --archive libVirtioMmioBlock.a --directory build/virtio-mmio-block-verified-bundle --subset",
+  "component:RamBlock",
+  "storage-bindings.py --component NativeRamBlock --archive libRamBlock.a --directory build/ram-block --subset",
   "build-software-aes-bindings.py",
   "build-marble-stubs.py",
   "build-mockfs-fixture.py",
@@ -84,19 +91,19 @@ DEVICE_MODEL = "marble"
 
 [payload]
 volume = "MARBLEESP"
-size_mib = 64
+size_mib = 160
 loader = "firmware"
 title = "UniXNU marble"
 panic_screen = true
-# Full UFS root bring-up: unverified root without a Data seed. Enable the
-# verified-root chain or the display arguments only when their archives exist.
-# See docs/REAL-DEVICE-TESTS.md.
-kernel_args = ["-v", "serial=3", "debug=0x14e", "cpus=8", "native-ufs-stream=0xe0", "native-ufs-smmu-takeover=1", "native-ufs-root=1", "sheng-pmgr=2", "-no_slto_panic"]
+# Owner-verified root on the userdata tail, with the SystemOS cache/union and
+# the ephemeral Data seed. See docs/REAL-DEVICE-TESTS.md.
+kernel_args = ["-v", "serial=3", "debug=0x14e", "cpus=8", "native-ufs-stream=0xe0", "native-ufs-smmu-takeover=1", "native-ufs-root=1", "native-ufs-root-lba=59589627", "native-ufs-root-blocks=2290688", "sheng-pmgr=2", "-no_slto_panic"]
 
 [payload.adt]
 chip_id = "207"
 owned_memory_size = "0x100000000"
 root_match_volume_uuid = "04769D26-2CA0-4825-B443-E2E5F88300F2"
+packed_data_ramdisk = true
 unique_chip_id = "required"
 ipad_identity = true
 
@@ -106,7 +113,7 @@ ipad_identity = true
 [bootimg.image]
 base = 0x80000000
 kernel_offset = 0x8000
-ramdisk_offset = 0xC00000
+ramdisk_offset = 0x28000000
 tags_offset = 0x100
 pagesize = 4096
 header_version = 0
@@ -116,8 +123,8 @@ header_version = 0
 [[bootimg.dtb_node]]
 path = "/chosen"
 props = [
-  { name = "linux,initrd-start", type = "x", value = "0x80C00000" },
-  { name = "linux,initrd-end", type = "x", value = "0x84C00000" },
+  { name = "linux,initrd-start", type = "x", value = "0xA8000000" },
+  { name = "linux,initrd-end", type = "x", value = "0xB2000000" },
 ]
 
 # Measured on the phone with the read-only UFS probe (2026-10-31):

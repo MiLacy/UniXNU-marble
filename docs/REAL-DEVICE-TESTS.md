@@ -194,73 +194,71 @@ clearing `SCTLR`/`CBAR`, and the retry range now covers all 128 context banks.
 The geometry is in `board.toml [userdata]`; `manifest status=1 windows=0`
 means the partition is the Android ext4 userdata, not a `SHNGROOT` image.
 
-## Stage 3 — System entry
+## Stage 3 — System entry (owner-verified tail root)
 
-**请使用 marble 实机测试：先备份 Android 数据，刷入 userdata 镜像，再启动
-完整 UFS root 镜像，确认根卷挂载、`launchd` 启动并记录最终的 panic 或启动
-进度。**
+**请使用 marble 实机测试：不刷入任何分区，直接 `fastboot boot` 本次镜像，确认
+owner 校验通过、SystemOS cache/union 挂载、`launchd` 启动，并进入 Data seed
+挂载阶段；记录屏幕最后状态与串口日志。**
 
-The current full UFS root build is **unverified root without a Data seed**.
-`CONFIG_XNU_VERIFIED_ROOT_PROBE`, `CONFIG_XNU_OWNER_ROOT_AUDIT`,
-`CONFIG_XNU_OWNER_ROOT_TRUST` and the Data chain are off. Expected outcomes:
-
-- best case: the root volume mounts and `launchd` starts, then stops because
-  `/private/var` (Data) does not exist;
-- likely: root authentication rejects the unverified OS/SystemOS images and
-  the kernel panics with the exact authentication text to capture.
-
-Inputs:
-
-- `/home/lacy/WorkSpace/UniXNU/out/marble/ipados-17.7.11-21H461/marble/userdata/userdata-root.img`
-  (9,382,658,048 bytes, SHA-256
-  `fd43ee7035ce185ce4215ac93fdc006fd784a54b3b7442e21457c226cbe03093`);
-- the matching full kernel `kernel.macho` SHA-256
-  `c3ea36a2b438f2f84bca0e342699b9640dfb61a7631463576674a1b63a1795bd`;
-- the current `boot.img` SHA-256
-  `ce8b5f6e57c716ecf0605839734bd2806d4ae470c83d96eb829842caff6147cc`.
-
-**Flashing `userdata` erases Android user data.** Back up first. `fastboot
-boot` still only boots the image; the boot partition is not replaced.
+This boot uses the OS/SystemOS images already written to the userdata tail
+(LBA 59589627, 2,290,688 4K blocks). Nothing is flashed now. The kernel carries
+the owner RSA-3072 anchor and the two signed block policies
+(`_verified_root_policies`, policy count 2). The SystemOS cache volume UUID is
+`8846FE78-2910-4297-AF97-D59BB6F8FC16`; the ephemeral Data seed UUID is
+`BD53A15B-2578-457C-96A0-CB299BE94D25` and travels as a 1,028,224-byte packed
+DBRDISK1 image (3 GiB logical) through the RamBlock transport.
 
 ```sh
 adb reboot bootloader
 fastboot devices
-fastboot flash userdata /home/lacy/WorkSpace/UniXNU/out/marble/ipados-17.7.11-21H461/marble/userdata/userdata-root.img
 fastboot boot /home/lacy/WorkSpace/UniXNU/out/marble/ipados-17.7.11-21H461/marble/boot/boot.img
 ```
 
+Do not run `flash`, `erase`, `format`, `set_active` or `oem` commands.
+
+Inputs:
+
+- `boot.img` 168,960,000 bytes, SHA-256
+  `2a0754ab9dd6885a4862a435a81b725a79dee26e9526831c527e5f2042710ea4`;
+- owner kernel `kernel.macho` SHA-256
+  `6b18e7e92120c47b75abbe626e639b80d39dcf63457ef8849de6bbee7ad590db`;
+- `payload.img` 160 MiB, SHA-256
+  `92e1a330adb1555972fd16617d1972948fd868a9f9c9b5f73e93b5d7cc157e05`,
+  payload kernel SHA-256
+  `9db2922e7ff9ffea1d7f418a3b87c38d9220080ad152e0fa8a2c6f3c0b7b29a3`;
+- Data seed `data-3g.dbr` SHA-256
+  `6f98478506e5f4c3319b4a0f0e7c4f5a326094f6ed1601b7e8d4851af0521e42`;
+- trust cache `marble-trust.bundle` SHA-256
+  `7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7`;
+- device tree SHA-256
+  `f095b5ec988d399f0ef5c5a3d3b99623ad290a1e16125f4ad7f953f3c0abef98`.
+
 Expected:
 
-- UFS logs the link speed, command queue and apps-SMMU stream `0xE0`.
-- `NativeUfsBlock` publishes the `OS` and `SystemOS` windows from the
-  userdata image.
-- The root volume UUID matches
+- `NATIVE_UFS` publishes the `OS` and `SystemOS` windows from LBA 59589627.
+- The owner policy verifies every read window and the root volume UUID is
   `04769D26-2CA0-4825-B443-E2E5F88300F2`.
-- XNU mounts the root and starts `launchd`, or panics with the unverified-root
-  authentication text.
+- The SystemOS cache volume mounts (`8846FE78-...`) and the SystemOS cryptex
+  union supplies `dyld` and `libSystem`.
+- `launchd` execs; the Data seed mounts as the ephemeral Data volume.
+- Then either the first SpringBoard/UI progress, or the exact panic text.
 
 Capture:
 
-- The UFS log (`NativeUfs:` lines), the root-matching line and the first
-  `launchd` line or the panic block.
-- A photo of the screen at the last visible state.
-- The `userdata` report (`userdata-root.json`) and the image SHA-256.
+- a photo of the screen at the last visible state;
+- the UFS/owner lines and the first `launchd` line or the panic block;
+- whether the Data seed mount line appears.
 
-If the root does not mount:
+If the boot stops:
 
-1. Verify the GPT first/last LBA and the 4096-byte logical block size.
-2. Confirm the data image was built from the same 21H461 IPSW.
-3. Confirm `native-ufs-stream=0xe0`, `native-ufs-smmu-takeover=1` and
-   `native-ufs-root=1` are in the packed command line.
-4. If the panic names an unresolved IOStorageFamily method or a bad vtable,
-   the storage bindings do not match the running prelink; rebuild with
-   `XNU_NATIVE_UFS_FULL=1` and re-check the symbols listed in
-   `scripts/data/native-storage-original-bindings.S`.
-5. If authentication rejects the root, the next step is the verified-root
-   bundle (`CONFIG_XNU_VERIFIED_ROOT_PROBE` and the owner-root audit/trust
-   switches), not a kernel change.
-
----
+1. Owner rejection: confirm the tail still contains the same OS/SystemOS
+   images the runner verified (same LBA geometry and manifest status).
+2. `launchd` `ENOEXEC` again: capture the dyld lines; the SystemOS union did
+   not resolve, check the cache volume UUID and mount status.
+3. Data mount failure: check the RamBlock publish and the packed DBRDISK1
+   header; the seed UUID must match `BD53A15B-...`.
+4. Root authentication panic: the signed policies or the owner anchor do not
+   match this kernel; do not fall back to unverified boot args.
 
 ## Stop conditions
 

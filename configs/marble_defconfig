@@ -1,8 +1,7 @@
-# Full UFS root configuration for marble (SM7475).
+# Owner-verified UFS tail root configuration for marble (SM7475).
 #
-# This boots XNU with the full UFS block driver and an unverified root; the
-# display stack, verified-root bundle and Data seed are later stages.
-# docs/FULL-SYSTEM.md lists that work.
+# The OS/SystemOS policies, SystemOS dyld cache/union and ephemeral Data seed
+# come from the macOS verified-root runner. The display stack is a later stage.
 CONFIG_XNU_BUILD_ARCHIVES=y
 CONFIG_XNU_ARM_DT_PLATFORM=y
 CONFIG_XNU_ARMCPU=y
@@ -22,12 +21,18 @@ CONFIG_XNU_NATIVE_LEGACY_DISPLAY=n
 CONFIG_XNU_NATIVE_ADRENO=n
 CONFIG_XNU_EXTRA_LD_ARCHIVES="{tree}/build/marble-stubs/libMarbleStubs.a"
 
-# The owner/verified-root and Data chain is a later stage:
-# CONFIG_XNU_VERIFIED_ROOT_PROBE is not set
-# CONFIG_XNU_OWNER_ROOT_AUDIT is not set
-# CONFIG_XNU_OWNER_ROOT_TRUST is not set
-# CONFIG_XNU_NATIVE_VIRTIO_BLOCK is not set
-# CONFIG_XNU_NATIVE_RAM_BLOCK is not set
-# CONFIG_XNU_OWNER_DATA_MOUNT is not set
-# CONFIG_XNU_OWNER_UNION_SYSTEMOS is not set
-# CONFIG_XNU_BOOT_PROGRESS is not set
+CONFIG_XNU_VERIFIED_ROOT_PROBE=y
+CONFIG_XNU_OWNER_ROOT_AUDIT=y
+CONFIG_XNU_OWNER_ROOT_TRUST=y
+CONFIG_XNU_NATIVE_VIRTIO_BLOCK=y
+CONFIG_XNU_OWNER_CACHE_MOUNT=y
+CONFIG_XNU_OWNER_CACHE_STARTUP=y
+CONFIG_XNU_OWNER_BOOT_MANIFEST=y
+CONFIG_XNU_OWNER_UNION_SYSTEMOS=y
+CONFIG_XNU_OWNER_DATA_MOUNT=y
+CONFIG_XNU_OWNER_DATA_VOLUME_UUID="BD53A15B-2578-457C-96A0-CB299BE94D25"
+CONFIG_XNU_OWNER_CACHE_VOLUME_UUID="8846FE78-2910-4297-AF97-D59BB6F8FC16"
+CONFIG_XNU_NATIVE_RAM_BLOCK=y
+CONFIG_XNU_VERIFIED_ROOT_ARCHIVE="{tree}/build/verified-root-os-xnu-bundle/libVerifiedRootProbe.a"
+CONFIG_XNU_NATIVE_VIRTIO_BLOCK_ARCHIVE="{tree}/build/virtio-mmio-block-verified-bundle/libVirtioMmioBlock.a"
+CONFIG_XNU_BOOT_PROGRESS=n
