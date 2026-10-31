@@ -21,6 +21,7 @@ extern "C" uint64_t marble_display_self;
 extern "C" uint64_t marble_display_kext;
 extern "C" uint64_t marble_display_iosvc;
 extern "C" uint64_t marble_display_kloaded;
+extern "C" uint64_t marble_display_reg;
 extern "C" uint32_t marble_display_last;
 extern "C" uint32_t marble_display_counts[262];
 
@@ -845,6 +846,7 @@ uint64_t marble_display_self;
 uint64_t marble_display_kext;
 uint64_t marble_display_iosvc;
 uint64_t marble_display_kloaded;
+uint64_t marble_display_reg;
 uint32_t marble_display_last;
 uint32_t marble_display_counts[262];
 }
@@ -870,9 +872,19 @@ marble_display_late_start(void)
 	marble_display_iosvc = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("IOService")) ? 1 : 0;
 	const OSMetaClass *base = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("IOMobileFramebuffer"));
 	marble_display_base = base ? 1 : 0;
-	if (!attempted) {
+	if (!attempted && base != nullptr) {
 		attempted = 1;
-		marble_marble_ctor();
+		// A MetaClass constructor only stalls the class; preModLoad opens the
+		// stall window and postModLoad registers it in the class dictionary.
+		void *load = OSMetaClass::preModLoad("com.apple.iokit.IOMobileGraphicsFamily");
+		if (load == nullptr) {
+			marble_display_reg = 0x100;
+		} else {
+			marble_marble_ctor();
+			OSReturn reg = OSMetaClass::postModLoad(load);
+			marble_display_reg = (reg == kOSReturnSuccess) ? 1
+			    : (uint64_t)(0x100 | (reg & 0xff));
+		}
 	}
 	const OSMetaClass *mc = OSMetaClass::getMetaClassWithName(OSSymbol::withCString("MarbleDisplay"));
 	marble_display_self = mc ? 1 : 0;

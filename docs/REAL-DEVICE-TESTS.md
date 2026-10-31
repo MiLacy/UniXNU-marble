@@ -265,6 +265,33 @@ If the boot stops:
 4. Root authentication panic: the signed policies or the owner anchor do not
    match this kernel; do not fall back to unverified boot args.
 
+## Stage 4 — CPU display via original family subclass
+
+Test with `fastboot boot` only; no partition writes.
+
+Inputs:
+
+- `boot.img` SHA-256
+  `fad538e872d009b62e5463215dbeac0d3a191050d495d1dea62d1ff427ee4773`;
+- owner kernel `kernel.macho` SHA-256
+  `a927643d33ebe1e3dca63c3a45979dc43e37ef7ffc169780da1c6384f50f5920`;
+- `payload.img` SHA-256
+  `fd02c1f2a9adcdf7b0f1cce4c50b5a4963125920a63b04769e26776e6208628f`.
+
+Expected on the bring-up page:
+
+- header `ALIVE <s>s | UFS ... MD 2/1/<calls> POL 0 CPU 1/1`;
+- `CLS base=1 self=1 kext=1 io=1 ld=1 reg=1`;
+- `MD` call counter starts moving when `backboardd` opens the framebuffer,
+  and the last ABI slot shown on the page names the first driver entry the
+  client calls (every unimplemented slot returns `kIOReturnUnsupported`).
+
+Failure codes in the `MD` second field: `2` no meta class, `3` no
+`/arm-io/disp0`, `4` node is not an IOService, `5` alloc failed, `6` init
+failed, `7` attach failed, `8` start failed. `reg` low byte is the
+`kOSMetaClass*` error when registration failed (`11` = kext not found).
+Stage 3 expectations above still apply.
+
 ## Stop conditions
 
 Stop and reset into the bootloader if:
