@@ -17,7 +17,7 @@
 #define BP_SCALE 3
 #define BP_CELL  (6 * BP_SCALE)
 #define BP_LINE  (14 * BP_SCALE)
-#define BP_LOGO_SCALE 7
+#define BP_LOGO_SCALE 5
 #define BP_PROGRESS_TOTAL 2290185ULL
 
 static unsigned mLogY, mHeaderY, mBarY;
@@ -45,6 +45,8 @@ __attribute__((weak)) uint32_t sweet_surf_last;
 __attribute__((weak)) uint64_t marble_display_calls;
 __attribute__((weak)) uint32_t marble_display_last;
 __attribute__((weak)) uint32_t marble_display_counts[262];
+__attribute__((weak)) uint64_t marble_display_started;
+extern volatile uint32_t armcpu_smp_fail[8];
 extern volatile uint32_t armcpu_smp_step[8];
 extern volatile uint32_t armcpu_core_timer[8];
 extern uint32_t processor_avail_count;
@@ -271,13 +273,12 @@ bp_splash (void)
 	unsigned scale = BP_LOGO_SCALE;
 	unsigned width = (unsigned)strlen (logo) * 6 * scale;
 	unsigned x = width < mWidth ? (mWidth - width) / 2 : 0;
-	unsigned y = mHeight / 24;
+	unsigned y = mHeight / 30;
 
 	for (const char *c = logo; *c; ++c) {
 		bp_glyph_s (x, y, *c, 0xFFFFFFFFu, 0xFF000000u, scale);
 		x += 6 * scale;
 	}
-	bp_text_centered (y + 14 * scale + 16, BP_SCALE, "marble - iPadOS bring-up");
 }
 
 static void
@@ -304,16 +305,12 @@ bp_header (void)
 	bp_number (native_ufs_verified_blocks, 10);
 	bp_emit ('/');
 	bp_number (native_ufs_block_reads, 10);
-	bp_text (" FB ");
-	bp_number (sweet_fb_started, 10);
+	bp_text (" MD ");
+	bp_number (marble_display_started, 10);
 	bp_emit ('/');
-	bp_number (sweet_fb_swap_count, 10);
+	bp_number (marble_display_calls, 10);
 	bp_emit ('/');
-	bp_number (sweet_fb_clients, 10);
-	bp_text (" SF ");
-	bp_number (sweet_surf_calls, 10);
-	bp_emit ('/');
-	bp_number (sweet_surf_last, 10);
+	bp_number (marble_display_last, 10);
 	bp_text (" POL ");
 	bp_number ((uint64_t)(unsigned)(sheng_launch_policy_status < 0 ? 9 : sheng_launch_policy_status), 10);
 	bp_text (" CPU ");
@@ -339,8 +336,8 @@ bp_beat (void)
 	mBeat++;
 	bp_header ();
 	{
-		unsigned scale = 2, cell = 6 * scale, line = 14 * scale, y = mHeight * 9 / 100;
-		bp_fill (0, y, mWidth, 2 * line, 0xFF000000u);
+		unsigned scale = 2, cell = 6 * scale, line = 14 * scale, y = mHeight * 7 / 100 + 20;
+		bp_fill (0, y, mWidth, 3 * line, 0xFF000000u);
 		unsigned col = 0;
 		const char *head = "CORES step ";
 		for (const char *c = head; *c; c++, col++) {
@@ -360,6 +357,17 @@ bp_beat (void)
 		for (unsigned i = 0; i < 8; i++) {
 			char ch = armcpu_core_timer[i] ? '1' : '0';
 			bp_glyph_s (col * cell, y + line, ch, 0xFFFFFFFFu, 0xFF000000u, scale); col++;
+		}
+		col = 0;
+		const char *head3 = "FAIL ";
+		for (const char *c = head3; *c; c++, col++) {
+			bp_glyph_s (col * cell, y + 2 * line, *c, 0xFFFFFFFFu, 0xFF000000u, scale);
+		}
+		for (unsigned i = 0; i < 8; i++) {
+			char digits[8]; unsigned n = 0; uint64_t v = armcpu_smp_fail[i];
+			do { digits[n++] = (char)('0' + v % 10); v /= 10; } while (v && n < sizeof (digits));
+			while (n) { bp_glyph_s (col * cell, y + 2 * line, digits[--n], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
+			bp_glyph_s (col * cell, y + 2 * line, i == 7 ? ' ' : ',', 0xFFFFFFFFu, 0xFF000000u, scale); col++;
 		}
 	}
 	if (mCrashStage == 1) {

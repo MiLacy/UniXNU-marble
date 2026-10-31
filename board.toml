@@ -99,7 +99,7 @@ title = "UniXNU marble"
 panic_screen = true
 # Owner-verified root on the userdata tail, with the SystemOS cache/union and
 # the ephemeral Data seed. See docs/REAL-DEVICE-TESTS.md.
-kernel_args = ["-v", "serial=3", "debug=0x14e", "cpus=8", "native-ufs-stream=0xe0", "native-ufs-smmu-takeover=1", "native-ufs-root=1", "native-ufs-root-lba=59589627", "native-ufs-root-blocks=2290688", "sheng-pmgr=2", "sheng-disable-jobs=com.apple.fairplayd.A2,com.apple.bluetoothd,com.apple.passd", "-no_slto_panic"]
+kernel_args = ["-v", "serial=3", "debug=0x14e", "cpus=8", "native-ufs-stream=0xe0", "native-ufs-smmu-takeover=1", "native-ufs-root=1", "native-ufs-root-lba=59589627", "native-ufs-root-blocks=2290688", "sheng-pmgr=2", "sheng-smp=1", "armcpu-spi-ipi=1", "armcpu-self-ipi=1", "armcpu-diagnostics=1", "sheng-disable-jobs=com.apple.fairplayd.A2,com.apple.bluetoothd,com.apple.passd", "-no_slto_panic"]
 
 # kern.hv_vmm_present=1: watchdogd treats the machine as a VM and exits 0 when
 # the Apple IOWatchdog service is absent (marble has no wdt,s5l8960x node);

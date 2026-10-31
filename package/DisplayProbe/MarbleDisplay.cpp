@@ -8,6 +8,7 @@
 extern "C" void boot_progress_stage(const char *message);
 
 extern "C" uint64_t marble_display_calls;
+extern "C" uint64_t marble_display_started;
 extern "C" uint32_t marble_display_last;
 extern "C" uint32_t marble_display_counts[262];
 
@@ -138,6 +139,7 @@ MarbleDisplay::start(IOService *provider)
 		provider->setProperty("canvas-height", video.v_height, 32);
 	}
 	registerService();
+	marble_display_started = 1;
 	boot_progress_stage("marble display: service started");
 	return true;
 }
@@ -812,9 +814,11 @@ MarbleDisplay::unclassified261()
 }
 
 extern "C" uint64_t marble_display_calls;
+extern "C" uint64_t marble_display_started;
 extern "C" uint32_t marble_display_last;
 extern "C" uint32_t marble_display_counts[262];
 uint64_t marble_display_calls;
+uint64_t marble_display_started;
 uint32_t marble_display_last;
 uint32_t marble_display_counts[262];
 
