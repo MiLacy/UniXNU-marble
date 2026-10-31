@@ -115,7 +115,7 @@ fastboot boot artifacts/marble-xnu-console/boot.img
 ```
 
 Its SHA-256 is
-`4c44a4ed1ba286b2ed5bac421ce2903a52b9c2c23794cfe42b6bc5fd51bc5cb8`.
+`d169cb16d8d9bb25b6184bd544ce0d831a6f01499f037ab1424972b67b696b7e`.
 It uses `configs/marble-console_defconfig`, `cpus=1`, no UFS root, no Data
 seed and no verified-root policy.
 

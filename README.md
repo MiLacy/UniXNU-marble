@@ -51,8 +51,8 @@ trust cache are enough.
 
 | Artifact | Size | SHA-256 |
 | --- | --- | --- |
-| `boot.img` | 169,607,168 | `4c44a4ed1ba286b2ed5bac421ce2903a52b9c2c23794cfe42b6bc5fd51bc5cb8` |
-| `payload.img` | 167,772,160 | `3d18a9f2f5b3a45213d4a33af17035cf9dd06464a4edea3f937effd5ddf63068` |
+| `boot.img` | 169,607,168 | `d169cb16d8d9bb25b6184bd544ce0d831a6f01499f037ab1424972b67b696b7e` |
+| `payload.img` | 167,772,160 | `4a416b4ef506ea69279cde3e7ebe5ffeacc9fbb3a77630f54b0d43612e36f1c9` |
 | console `kernel.macho` | 51,073,024 | `5270a0b93bea8db7de01f56440f8142430df4395954bf18335f8f5806c32e6df` |
 | patched payload kernel | 51,073,024 | `87d112816c1aeaea046510bcfa210de4cbc72d3696cef1fcef0f0077f83679a5` |
 | trust cache | 61,356 | `7416ca4f8377146626bb284e2133c76bee6cb4e3ee0af5d648b186235a7323a7` |
