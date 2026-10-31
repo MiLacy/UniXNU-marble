@@ -45,6 +45,8 @@ def main():
     parser.add_argument('image', type=Path)
     parser.add_argument('--block-device', default='/dev/block/by-name/userdata')
     parser.add_argument('--remote-image', default='/tmp/marble-root.img')
+    parser.add_argument('--no-push', action='store_true',
+                        help='use an image already present at --remote-image')
     parser.add_argument('--execute', action='store_true',
                         help='perform the write; without it only print the commands')
     args = parser.parse_args()
@@ -84,9 +86,14 @@ def main():
     if devices.returncode or '\tdevice' not in devices.stdout:
         print('adb device is not ready; reboot to TWRP/recovery and retry', file=sys.stderr)
         return 1
-    if not run(['adb', 'push', str(args.image), args.remote_image]).returncode:
-        pass
-    else:
+    if args.no_push:
+        remote_hash = adb([f'sha256sum {args.remote_image}'], capture_output=True)
+        if remote_hash.returncode or not remote_hash.stdout.startswith(digest):
+            print(f'{args.remote_image} is missing or does not match the host SHA-256',
+                  file=sys.stderr)
+            return 1
+        print(f'remote image hash matches {digest}')
+    elif run(['adb', 'push', str(args.image), args.remote_image]).returncode:
         return 1
 
     # Preserve and verify the first partition block (Android ext4 or its metadata).
@@ -107,6 +114,13 @@ def main():
     if 'UNCHANGED' not in compared.stdout:
         print('the first userdata block changed; stop and inspect before booting', file=sys.stderr)
         return 1
+    manifest = adb([f'dd if={args.block_device} bs={BLOCK} skip={SEEK} count=1 2>/dev/null | '
+                    f'od -An -tx1 -N8'], capture_output=True)
+    magic = manifest.stdout.split()
+    if ' '.join(magic) != '53 48 4e 47 52 4f 4f 54':
+        print(f'root window does not start with SHNGROOT: {manifest.stdout!r}', file=sys.stderr)
+        return 1
+    print('root window starts with SHNGROOT; Android first block unchanged')
     print('tail write complete; boot the root image next')
     return 0
 
