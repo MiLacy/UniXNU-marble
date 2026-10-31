@@ -1,0 +1,38 @@
+name: verified-root-data
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 180
+    steps:
+      - name: Check out the device repository
+        uses: actions/checkout@v4
+        with:
+          path: device
+
+      - name: Check out UniXNU
+        uses: actions/checkout@v4
+        with:
+          repository: UniXNU/UniXNU
+          ref: f0721e9745c45ad2600cd69c74730f1cca55d56a
+          path: unixnu
+          submodules: recursive
+
+      - name: Install OpenSSL
+        run: brew install openssl@3
+
+      - name: Build owner-signed OS/SystemOS policies and Data seed
+        run: bash ./device/scripts/macos-verified-root.sh "$GITHUB_WORKSPACE/unixnu" "$GITHUB_WORKSPACE/device"
+
+      - name: Upload verified-root artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-root-data
+          path: device/artifacts/verified-root-data
+          if-no-files-found: error

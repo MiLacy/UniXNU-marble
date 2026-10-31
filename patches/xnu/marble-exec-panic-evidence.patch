@@ -1,0 +1,53 @@
+--- a/home/lacy/WorkSpace/kern_exec.c.orig2	2026-10-31 02:06:34.862799325 +0800
++++ b/bsd/kern/kern_exec.c	2026-10-31 02:15:09.270784610 +0800
+@@ -2208,6 +2208,10 @@
+  *	<ex_imgact>:???			[anything an imgact can return]
+  *	EDEADLK				Process is being terminated
+  */
++uint32_t g_exec_first_word;
++uint32_t g_exec_second_word;
++extern uint32_t decmpfs_registered_mask(void);
++
+ static int
+ exec_activate_image(struct image_params *imgp)
+ {
+@@ -2298,6 +2302,10 @@
+ 	if (resid) {
+ 		memset(imgp->ip_vdata + (PAGE_SIZE - resid), 0x0, resid);
+ 	}
++	if (imgp->ip_vdata != NULL) {
++		memcpy(&g_exec_first_word, imgp->ip_vdata, sizeof(g_exec_first_word));
++		memcpy(&g_exec_second_word, (uint8_t *)imgp->ip_vdata + sizeof(g_exec_first_word), sizeof(g_exec_second_word));
++	}
+ 
+ encapsulated_binary:
+ 	/* Limit the number of iterations we will attempt on each binary */
+@@ -8259,7 +8267,7 @@
+ 		}
+ 	}
+ 
+-	panic("Process 1 exec of %s failed, errno %d", ((i == 0) ? "<null>" : init_programs[i - 1]), error);
++	panic("Process 1 exec of %s failed, errno %d first=%08x second=%08x decmpfs=%04x", ((i == 0) ? "<null>" : init_programs[i - 1]), error, g_exec_first_word, g_exec_second_word, decmpfs_registered_mask());
+ }
+ 
+ /*
+--- a/home/lacy/WorkSpace/decmpfs.c.orig2	2026-10-31 02:06:34.866799325 +0800
++++ b/bsd/kern/decmpfs.c	2026-10-31 02:06:51.134798860 +0800
+@@ -2377,4 +2377,17 @@
+ 	}
+ 	printf("DECMPFS: registration scan done\n");
+ }
++
++uint32_t
++decmpfs_registered_mask(void)
++{
++	uint32_t mask = 0;
++	int i;
++	for (i = 0; i < 16; i++) {
++		if (decompressors[i] != NULL) {
++			mask |= 1U << i;
++		}
++	}
++	return mask;
++}
+ #endif /* FS_COMPRESSION */

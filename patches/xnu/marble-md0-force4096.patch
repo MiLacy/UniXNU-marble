@@ -1,0 +1,13 @@
+--- a/home/lacy/WorkSpace/memdev.c.orig2	2026-10-31 02:39:50.586742236 +0800
++++ b/bsd/dev/memdev.c	2026-10-31 02:39:50.602742235 +0800
+@@ -423,7 +423,9 @@
+ 		if (*f < DEV_BSIZE) {
+ 			return EINVAL;                                /* Too short? */
+ 		}
+-		mdev[devid].mdSecsize = *f;                                             /* set the new block size */
++		/* Keep md0 at the APFS container block size even if the caller asks
++		 * for 512; the restore-ramdisk APFS xattr/extent path depends on it. */
++		mdev[devid].mdSecsize = (devid == 0) ? 4096 : *f;
+ 		break;
+ 
+ 	case DKIOCISWRITABLE:

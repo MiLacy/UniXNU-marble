@@ -1,0 +1,17 @@
+--- a/home/lacy/WorkSpace/bsd_init.c.rootauth.orig	2026-10-31 09:55:17.801994844 +0800
++++ b/bsd/kern/bsd_init.c	2026-10-31 09:55:17.817994843 +0800
+@@ -1098,7 +1098,13 @@
+ 			}
+ #endif
+ 			if (autherr && !owner_authorized) {
+-				panic("rootvp not authenticated after mounting");
++				int allow_unverified = 0;
++				if (PE_parse_boot_argn("root-unverified", &allow_unverified, sizeof(allow_unverified)) &&
++				    allow_unverified == 1) {
++					printf("bsd_init: root authentication error %d ignored (root-unverified)\n", autherr);
++				} else {
++					panic("rootvp not authenticated after mounting");
++				}
+ 			}
+ #if defined(XNU_OWNER_ROOT_TRUST) && XNU_OWNER_ROOT_TRUST
+ 			{

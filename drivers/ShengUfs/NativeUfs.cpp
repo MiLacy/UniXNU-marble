@@ -1653,6 +1653,12 @@ static void publishThread (void *, wait_result_t)
       gRootDiagnostic.stage = "media publication";
       gRootDiagnostic.publicationPhase = static_cast<unsigned> (UfsRootPhase::Media);
       gRootDiagnostic.publicationWindow = index;
+      // Unverified publication has no signed volume UUID. Do not stall the
+      // publisher on an empty UUID; the root mount itself waits for OS media.
+      if (!uuid[0]) {
+        IOLog ("NativeUfs: %s unverified, media wait skipped\n", device->windowLabel ());
+        return true;
+      }
       bool ready = false;
       // Diagnostic mode affects reporting only, never the dependency gate.
       for (unsigned tick = 0; tick <= 300; ++tick) {
@@ -1957,7 +1963,13 @@ bool NativeUfs::startRoot (IOService *provider)
       }
       return true;
 #else
-      return false; // Root publication requires owner verification in every build.
+      uint32_t allowUnverified = 0;
+      if (PE_parse_boot_argn ("native-ufs-allow-unverified", &allowUnverified, sizeof (allowUnverified)) &&
+          allowUnverified == 1) {
+        gRootDiagnostic.stage = "signed window identities (unverified allowed)";
+        return true;
+      }
+      return false; // Root publication requires owner verification unless explicitly overridden.
 #endif
     }
     bool schedule () {

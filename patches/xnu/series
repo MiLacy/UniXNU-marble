@@ -1,3 +1,8 @@
 # Board XNU patches, one path per line in application order.
 
 marble-virtual-timer-only.patch
+marble-decmpfs-delay.patch
+marble-exec-panic-evidence.patch
+marble-md0-blocksize.patch
+marble-md0-force4096.patch
+marble-root-unverified.patch

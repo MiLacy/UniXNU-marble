@@ -141,6 +141,22 @@ static bool findRootLayout (RootLayout *layout, const char **why)
     *why = "no userdata partition";
     return false;
   }
+  // Optional tail window: the root image may be pre-written into unused space
+  // at the end of userdata instead of flashing the whole partition. Values are
+  // 4096-byte LBAs/counts and must stay inside the GPT userdata entry.
+  uint32_t rootLba = 0, rootBlocks = 0;
+  PE_parse_boot_argn ("native-ufs-root-lba", &rootLba, sizeof (rootLba));
+  PE_parse_boot_argn ("native-ufs-root-blocks", &rootBlocks, sizeof (rootBlocks));
+  if (rootLba || rootBlocks) {
+    uint64_t originalFirst = layout->userdataFirst, originalLast = layout->userdataLast;
+    if (!rootLba || !rootBlocks || rootLba < originalFirst ||
+        rootBlocks > originalLast - rootLba + 1) {
+      *why = "root tail window bounds";
+      return false;
+    }
+    layout->userdataFirst = rootLba;
+    layout->userdataLast = rootLba + rootBlocks - 1;
+  }
   gRootDiagnostic.first = layout->userdataFirst;
   gRootDiagnostic.last = layout->userdataLast;
   gRootDiagnostic.stage = "root manifest";

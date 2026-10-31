@@ -1,0 +1,13 @@
+--- a/home/lacy/WorkSpace/memdev.c.orig	2026-10-31 02:25:20.762767118 +0800
++++ b/bsd/dev/memdev.c	2026-10-31 02:25:20.778767117 +0800
+@@ -697,7 +697,9 @@
+ 
+ 	mdev[devid].mdBase = base;                                                      /* Set the base address of ram disk */
+ 	mdev[devid].mdSize = size;                                                      /* Set the length of the ram disk */
+-	mdev[devid].mdSecsize = DEV_BSIZE;                                      /* Set starting block size */
++	/* APFS containers use 4096-byte blocks; a 512-byte md0 makes file
++	 * extents read the wrong block (observed: launchd read block 0). */
++	mdev[devid].mdSecsize = (devid == 0) ? 4096 : DEV_BSIZE;
+ 	if (phys) {
+ 		mdev[devid].mdFlags |= mdPhys;                          /* Show that we are in physical memory */
+ 	}
