@@ -85,23 +85,31 @@ def main():
         raise SystemExit('Require one existing exact read-only image attachment')
     entities = found[0]['system-entities']
     volume_info = plistlib.loads(subprocess.check_output(['diskutil', 'info', '-plist', str(mountpoint)]))
-    whole = [e['dev-entry'] for e in entities if e.get('content-hint') == 'GUID_partition_scheme']
-    if not whole:
-        # SystemOS is a raw UDRW APFS container: hdiutil exposes the whole
-        # disk without a GPT partition scheme.
-        whole = [e['dev-entry'] for e in entities if re.fullmatch(r'/dev/disk\d+', e.get('dev-entry', ''))]
-    if not whole:
-        match = re.match(r'(/dev/disk\d+)', volume_info.get('DeviceNode', ''))
-        whole = [match.group(1)] if match else []
-    if len(whole) != 1:
+    candidates = [e['dev-entry'] for e in entities if re.fullmatch(r'/dev/disk\d+', e.get('dev-entry', ''))]
+    match = re.match(r'(/dev/disk\d+)', volume_info.get('DeviceNode', ''))
+    if match and match.group(1) not in candidates:
+        candidates.append(match.group(1))
+    good = []
+    for device in candidates:
+        try:
+            candidate = plistlib.loads(subprocess.check_output(['diskutil', 'info', '-plist', device]))
+        except subprocess.CalledProcessError:
+            continue
+        if (candidate.get('BusProtocol') == 'Disk Image' and candidate.get('TotalSize') == expected_bytes and
+                candidate.get('Writable') is False):
+            good.append((device, candidate))
+    if len(good) != 1:
+        print(json.dumps(dict(entities=entities, volume=volume_info, candidates=candidates,
+                              good=[(d, {k: c.get(k) for k in ('BusProtocol', 'TotalSize', 'Writable', 'DeviceNode')})
+                                    for d, c in good]), indent=2))
         raise SystemExit('Require one actual whole virtual media mapping')
-    info = plistlib.loads(subprocess.check_output(['diskutil', 'info', '-plist', whole[0]]))
+    whole, info = good[0]
     if (info.get('BusProtocol') != 'Disk Image' or info.get('Writable') is not False or
-            info.get('DeviceNode') != whole[0] or info.get('TotalSize') != expected_bytes or
+            info.get('DeviceNode') != whole or info.get('TotalSize') != expected_bytes or
             volume_info.get('VolumeUUID') != str(expected_uuid).upper() or volume_info.get('Writable') is not False or
             volume_info.get('DeviceNode') not in [e['dev-entry'] for e in entities]):
         raise SystemExit('Only the actual matching read-only Disk Image/volume is accepted')
-    disk = Path('/dev/r' + Path(whole[0]).name)
+    disk = Path('/dev/r' + Path(whole).name)
     if not stat.S_ISCHR(disk.stat().st_mode):
         raise SystemExit('Require the verified virtual-media raw character device')
 
