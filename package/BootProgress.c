@@ -51,13 +51,8 @@ extern volatile uint32_t armcpu_smp_step[8];
 extern volatile uint32_t armcpu_core_timer[8];
 extern uint32_t processor_avail_count;
 extern unsigned int processor_count;
-extern int sheng_crash_log_read (void);
-extern volatile int sheng_crash_log_ready;
-extern char sheng_crash_log_text[];
-static uint64_t mCrashAt;
-static unsigned mCrashStage;
 extern volatile int sheng_launch_policy_status;
-static unsigned mStatusY, mWhyY;
+static unsigned mStatusY;
 extern volatile uint64_t native_ufs_verified_blocks;
 
 static int
@@ -370,67 +365,6 @@ bp_beat (void)
 			bp_glyph_s (col * cell, y + 2 * line, i == 7 ? ' ' : ',', 0xFFFFFFFFu, 0xFF000000u, scale); col++;
 		}
 	}
-	if (mCrashStage == 1) {
-		uint64_t wait = (uint64_t)mBeatInterval * (2 + 2 * (uint64_t)0);
-		if (now - mCrashAt >= 2 * wait) {
-			if (sheng_crash_log_read () == 0 && sheng_crash_log_ready == 0) {
-				mCrashStage = 2;
-			} else if (now - mCrashAt >= 8 * wait) {
-				mCrashStage = 2;
-				strlcpy (sheng_crash_log_text, "no crash report found", 64);
-			}
-		}
-	}
-	if (mCrashStage == 0 && marble_display_calls) {
-		unsigned y = mHeight * 6 / 100;
-		unsigned scale = 2, cols = mWidth / (6 * scale), col = 0, shown = 0;
-		char buf[24];
-		bp_fill (0, y, mWidth, 14 * scale, 0xFF000000u);
-		const char *head = "DISPLAY calls ";
-		for (const char *c = head; *c; c++) {
-			bp_glyph_s (col * 6 * scale, y, *c, 0xFFFFFFFFu, 0xFF000000u, scale); col++;
-		}
-		char digits[24];
-		unsigned n = 0; uint64_t v = marble_display_calls;
-		do { digits[n++] = (char)('0' + v % 10); v /= 10; } while (v && n < sizeof (digits));
-		while (n) { bp_glyph_s (col * 6 * scale, y, digits[--n], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
-		const char *tail = " last ";
-		for (const char *c = tail; *c; c++) {
-			bp_glyph_s (col * 6 * scale, y, *c, 0xFFFFFFFFu, 0xFF000000u, scale); col++;
-		}
-		n = 0; v = marble_display_last;
-		do { digits[n++] = (char)('0' + v % 10); v /= 10; } while (v && n < sizeof (digits));
-		while (n) { bp_glyph_s (col * 6 * scale, y, digits[--n], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
-		for (unsigned slot = 168; slot < 262 && shown < 6 && col + 10 < cols; slot++) {
-			if (!marble_display_counts[slot]) continue;
-			shown++;
-			bp_glyph_s (col * 6 * scale, y, ' ', 0xFFFFFFFFu, 0xFF000000u, scale); col++;
-			char num[8]; unsigned k = 0; uint64_t sv = slot;
-			do { num[k++] = (char)('0' + sv % 10); sv /= 10; } while (sv && k < sizeof (num));
-			while (k) { bp_glyph_s (col * 6 * scale, y, num[--k], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
-			bp_glyph_s (col * 6 * scale, y, 'x', 0xFFFFFFFFu, 0xFF000000u, scale); col++;
-			k = 0; sv = marble_display_counts[slot];
-			do { num[k++] = (char)('0' + sv % 10); sv /= 10; } while (sv && k < sizeof (num));
-			while (k) { bp_glyph_s (col * 6 * scale, y, num[--k], 0xFFFFFFFFu, 0xFF000000u, scale); col++; }
-		}
-	}
-	if (mCrashStage == 2) {
-		unsigned y = mHeight * 4 / 100;
-		unsigned scale = 2;
-		unsigned cols = mWidth / (6 * scale);
-		bp_fill (0, y, mWidth, 8 * 14 * scale, 0xFF000000u);
-		const char *s = sheng_crash_log_text;
-		for (unsigned line = 0; line < 8 && *s; line++) {
-			bp_text_at (0, y + line * 14 * scale, scale, "", 0xFFFFFFFFu);
-			unsigned col = 0;
-			while (*s && col < cols - 1) {
-				char ch = *s++;
-				bp_glyph_s (col * 6 * scale, y + line * 14 * scale, ch, 0xFFFFFFFFu, 0xFF000000u, scale);
-				col++;
-			}
-		}
-		mCrashStage = 3;
-	}
 	bp_unlock ();
 }
 
@@ -458,7 +392,6 @@ boot_progress_bind (uintptr_t base, unsigned width, unsigned height, unsigned ro
 	mCols = width / BP_CELL;
 	mBarY = mHeight * 12 / 100;
 	mStatusY = mBarY + 92;
-	mWhyY = mStatusY + BP_LINE;
 	mHeaderY = mHeight * 20 / 100;
 	mLogY = mHeaderY + BP_LINE;
 	mX = 0;
@@ -567,11 +500,6 @@ boot_progress_critical_exit (int pid, char *text, unsigned long size)
 void
 boot_progress_exit (int pid, const char *name, int status, unsigned ns, uint64_t code)
 {
-	if (ns == 2 && name && (strncmp (name, "backboardd", 10) == 0 ||
-	    strncmp (name, "SpringBoard", 11) == 0)) {
-		mCrashAt = mach_absolute_time ();
-		mCrashStage = 1;
-	}
 	if (!mReady || ns == 0 || !bp_lock ()) {
 		return;
 	}
@@ -586,31 +514,6 @@ boot_progress_exit (int pid, const char *name, int status, unsigned ns, uint64_t
 	bp_text (" code ");
 	bp_number (code, 16);
 	bp_emit ('\n');
-	bp_unlock ();
-}
-
-void
-boot_progress_exit_reason (const char *name, const char *reason)
-{
-	unsigned saved_x, saved_y, used = 0;
-
-	if (!mReady || !reason || !*reason || !bp_lock ()) {
-		return;
-	}
-	saved_x = mX;
-	saved_y = mY;
-	bp_fill (0, mWhyY, mWidth, BP_LINE, 0xFF000000u);
-	mX = 0;
-	mY = mWhyY;
-	bp_text (name ? name : "?");
-	bp_text (": ");
-	for (const char *c = reason; *c && used < 44; c++) {
-		char ch = (*c >= 32 && *c <= 126) ? *c : ' ';
-		bp_emit (ch);
-		used++;
-	}
-	mX = saved_x;
-	mY = saved_y;
 	bp_unlock ();
 }
 
