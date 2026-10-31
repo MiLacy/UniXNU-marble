@@ -414,15 +414,17 @@ boot_progress_process_stage (int pid, const char *name, const char *stage)
 	lines++;
 	{
 		unsigned saved_x = mX, saved_y = mY;
+		unsigned used = 0;
 		bp_fill (0, mStatusY, mWidth, BP_LINE, 0xFF000000u);
 		mX = 0;
 		mY = mStatusY;
-		bp_text ("EXEC ");
-		bp_text (name ? name : "?");
-		bp_emit ('[');
-		bp_number ((uint64_t)(unsigned)pid, 10);
-		bp_text ("] ");
-		bp_text (stage ? stage : "?");
+		const char *text[3] = { "EXEC ", name ? name : "?", stage ? stage : "?" };
+		for (unsigned part = 0; part < 3; part++) {
+			for (const char *c = text[part]; *c && used < 52; c++) {
+				bp_emit (*c);
+				used++;
+			}
+		}
 		mX = saved_x;
 		mY = saved_y;
 	}
