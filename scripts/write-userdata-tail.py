@@ -83,7 +83,7 @@ def main():
         return 0
 
     devices = run(['adb', 'devices'], capture_output=True)
-    if devices.returncode or '\tdevice' not in devices.stdout:
+    if devices.returncode or not any(state in devices.stdout for state in ('\tdevice', '\trecovery')):
         print('adb device is not ready; reboot to TWRP/recovery and retry', file=sys.stderr)
         return 1
     if args.no_push:
