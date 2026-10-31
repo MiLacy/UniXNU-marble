@@ -15,7 +15,7 @@ root and the userland stages remain open.
 | --- | --- | --- |
 | 1. UEFI / UniXNU menu | verified on marble | `UniXNU.efi`, `UniXNUDxe`, `UniXNURamDiskDxe` and `DarwinBoot` are in the 3 MiB marble firmware volume |
 | 2. XNU kernel entry | **device-verified 2026-11-01** | XNU 10063.141.1 console kernel with the SM7475 patches; it reaches `IOKitBSDInit.cpp:984` and stops at the expected missing root device |
-| 3. System entry | **device-verified root + launchd; mount retest pending** | unverified UFS root: `NativeUfsBlock` reads OS/SystemOS from LBA `59589627..61880314`; the SystemOS union supplies `libSystem` and launchd starts. launchd then spawns `/sbin/mount` (PID 3), which exits 66 because no boot-manifest-hash is published. No verified-root bundle or Data seed. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
+| 3. System entry | **verified image built; device test pending** | unverified UFS root: `NativeUfsBlock` reads OS/SystemOS from LBA `59589627..61880314`; the SystemOS union supplies `libSystem` and launchd starts. launchd then spawns `/sbin/mount` (PID 3), which exits 66 because no boot-manifest-hash is published. No verified-root bundle or Data seed. See [FULL-SYSTEM.md](docs/FULL-SYSTEM.md) |
 
 **Please test on a real marble at every stage.** The exact prompts, commands
 and observations to capture are in [REAL-DEVICE-TESTS.md](docs/REAL-DEVICE-TESTS.md).
@@ -102,6 +102,33 @@ fastboot boot artifacts/marble-root-screenlog/boot.img
 
 This is still screen-only: XNU has no adb or USB serial channel. The
 `--no-panic-screen` debug image is a separate fallback.
+
+## Verified image (GitHub macOS + Linux link)
+
+The macOS-only owner policies and Data seed were produced by the
+[`verified-root-data` workflow](.github/workflows/verified-root.yml) on a
+GitHub-hosted macOS runner. The Linux host then built
+`libVerifiedRootProbe.a` and linked the verified kernel.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `artifacts/marble-verified/boot.img` | `23592cd6ad4b3b2db96c6c825605dc0bde5e562dc0e9ddc298ba3c3493af9e4d` |
+| verified `kernel.macho` | `46873b37e857dd9f5e8ec58a1f6e01b5bc0f58af2f38e4c02edfae3821b478ed` |
+| payload | `cdf90334d3076338ff58ed5f1791d420d9b7e387d646779227d9db21903b8c89` |
+| Data seed | `6f98478506e5f4c3319b4a0f0e7c4f5a326094f6ed1601b7e8d4851af0521e42` |
+
+```sh
+fastboot boot artifacts/marble-verified/boot.img
+```
+
+This image uses the owner-signed OS/SystemOS policies, the owner boot-manifest
+path and the Data seed; it does not use the development boot-manifest hash.
+The userdata tail is unchanged.
+
+The macOS-15 workflow run reached both owner policy builds and then failed in
+`seed-data-grow.py` (`No APFS container found on the attached seed`). The
+verified image above uses the previously successful `verified-root-data`
+artifact; a future fresh run needs that seed-grow step fixed.
 
 The root is **unverified**: the payload passes `native-ufs-allow-unverified=1`
 and `root-unverified=1`. This build also enables the read-only SystemOS union

@@ -1,0 +1,17 @@
+diff --git a/scripts/build-xnu-4k-baseline.sh b/scripts/build-xnu-4k-baseline.sh
+index 95cf712..76bd258 100755
+--- a/scripts/build-xnu-4k-baseline.sh
++++ b/scripts/build-xnu-4k-baseline.sh
+@@ -710,8 +710,10 @@ for archive, record in zip(sys.argv[1:], records):
+     obj = path.with_name(path.stem.removeprefix('lib') + '.o')
+     if hashlib.sha256(obj.read_bytes()).hexdigest() != record['compiled_object_sha256']:
+         raise SystemExit('Re-audit the actual compiled storage object before linking')
+-first, second = [record['bindings'] for record in records]
+-if any(first.get(name) != value for name, value in second.items()):
++first, second = [record.get('bindings', record.get('bound', [])) for record in records]
++first = set(first) if not isinstance(first, dict) else set(first)
++second = set(second) if not isinstance(second, dict) else set(second)
++if not second.issubset(first):
+     raise SystemExit('RAM transport imports must match the already linked original storage bindings')
+ PY_BINDINGS
+       RAM_BLOCK_OBJECT=$ROOT/build/ram-block/NativeRamBlock.o

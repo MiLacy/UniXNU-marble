@@ -301,6 +301,25 @@ SHA-384 of `MarbleBringup.BootSet.v1\0`, not an Apple/owner signature. The
 resulting `boot.img` is `ce31ab2f...`; use it to check whether mount phase 1
 passes and what the next userland checkpoint is.
 
+### Verified image result
+
+A verified boot image was linked from the successful macOS `verified-root-data`
+artifact and the local `libVerifiedRootProbe.a`:
+
+```text
+artifacts/marble-verified/boot.img
+SHA-256 23592cd6ad4b3b2db96c6c825605dc0bde5e562dc0e9ddc298ba3c3493af9e4d
+```
+
+It contains the OS and SystemOS owner policies, the Data seed
+`6f984785...` and the verified-root probe. It has not been booted on marble
+yet. Boot it with `fastboot boot`; the userdata tail is already written.
+
+The GitHub macOS-15 workflow run failed at the optional 3 GiB seed grow
+(`No APFS container found on the attached seed`), so this image uses the
+previous successful artifact. Future runs need that step fixed before a fresh
+seed can be generated.
+
 ## Stage 3 — System entry (owner-verified tail root)
 
 **请使用 marble 实机测试：不刷入任何分区，直接 `fastboot boot` 本次镜像，确认
