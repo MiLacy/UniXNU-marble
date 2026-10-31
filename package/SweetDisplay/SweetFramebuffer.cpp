@@ -43,6 +43,7 @@
 #include <pexpert/pexpert.h>
 #include <kern/clock.h>
 #include <sys/proc.h>
+extern "C" void boot_progress_stage(const char *message);
 
 enum {
 	kSweetFBGetLayerDefaultSurface  = 3,
@@ -91,11 +92,15 @@ public:
 	OSArray      *fClients;
 	uint32_t      fSwapID;
 	bool          fConsolePaused;
+	uint8_t       fPending[SWEET_FB_SWAP_REC_SIZE];
+	bool          fDirty;
+	uint32_t      fFlushTicks;
 
 	bool start(IOService *provider) APPLE_KEXT_OVERRIDE;
 	void addClient(IOMobileFramebufferUserClient *client);
 	void removeClient(IOMobileFramebufferUserClient *client);
 	void swap(const uint8_t *rec);
+	void present(const uint8_t *rec);
 };
 
 OSDefineMetaClassAndStructors(AppleCLCD, IOMobileFramebuffer);
@@ -138,6 +143,7 @@ AppleCLCD::start(IOService *provider)
 	fRowBytes = (uint32_t)video.v_rowBytes;
 	if (fPhys == 0 || fWidth == 0 || fHeight == 0 || fRowBytes < fWidth * 4) {
 		IOLog("SWEET FB: no boot framebuffer\n");
+		boot_progress_stage("sweetfb start FAIL no framebuffer");
 		return false;
 	}
 	fLock = IOLockAlloc();
@@ -158,10 +164,19 @@ AppleCLCD::start(IOService *provider)
 	}
 	fVsync->setTimeoutUS(SWEET_FB_VSYNC_US);
 
+	fDirty = false;
+	uint32_t hz = 10;
+	PE_parse_boot_argn("sweetfb_hz", &hz, sizeof(hz));
+	fFlushTicks = (hz == 0 || hz >= 60) ? 1 : 60 / hz;
 	setProperty(kIOUserClientClassKey, "IOMobileFramebufferUserClient");
 	setProperty("external", false);
 	setProperty("DisplayPipePlaneBaseAlignment", 64ULL, 32);
+	if (provider != nullptr) {
+		provider->setProperty("canvas-width", fWidth, 32);
+		provider->setProperty("canvas-height", fHeight, 32);
+	}
 	registerService();
+	boot_progress_stage("sweetfb start OK");
 	IOLog("SWEET FB: AppleCLCD %ux%u stride %u at 0x%llx, default surface %u\n",
 	    fWidth, fHeight, fRowBytes, fPhys, fSurface->id);
 	return true;
@@ -179,13 +194,23 @@ AppleCLCD::vsyncFired(OSObject *owner, IOTimerEventSource *sender)
 		0, 0,
 	};
 
+	uint8_t rec[SWEET_FB_SWAP_REC_SIZE];
+	bool flush;
 	IOLockLock(fb->fLock);
 	for (unsigned int i = 0; i < fb->fClients->getCount(); i++) {
 		IOMobileFramebufferUserClient *client =
 		    (IOMobileFramebufferUserClient *)fb->fClients->getObject(i);
 		client->notify(SWEET_FB_NOTIFY_VSYNC, values, 6);
 	}
+	flush = fb->fDirty && ((count % fb->fFlushTicks) == 0);
+	if (flush) {
+		memcpy(rec, fb->fPending, sizeof(rec));
+		fb->fDirty = false;
+	}
 	IOLockUnlock(fb->fLock);
+	if (flush) {
+		fb->present(rec);
+	}
 	sender->setTimeoutUS(SWEET_FB_VSYNC_US);
 }
 
@@ -217,10 +242,22 @@ get32(const uint8_t *p, uint32_t off)
 }
 
 static uint32_t sweet_fb_swaps_logged;
+uint64_t sweet_fb_swap_count;
+
+/* Record the latest swap; the vsync timer presents it at most sweetfb_hz times per second. */
+void
+AppleCLCD::swap(const uint8_t *rec)
+{
+	IOLockLock(fLock);
+	memcpy(fPending, rec, SWEET_FB_SWAP_REC_SIZE);
+	fDirty = true;
+	IOLockUnlock(fLock);
+	__atomic_fetch_add(&sweet_fb_swap_count, 1, __ATOMIC_RELAXED);
+}
 
 /* Copy each enabled layer's surface into the panel memory (no scaling). */
 void
-AppleCLCD::swap(const uint8_t *rec)
+AppleCLCD::present(const uint8_t *rec)
 {
 	uint32_t mask = get32(rec, 0x104);
 

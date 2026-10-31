@@ -37,6 +37,7 @@ static volatile unsigned mBrkEsr, mAbortEsr, mAbortFar;
 static volatile int mBeat;
 
 extern volatile uint64_t native_ufs_block_reads;
+extern uint64_t sweet_fb_swap_count;
 extern volatile uint64_t native_ufs_verified_blocks;
 
 static int
@@ -285,10 +286,8 @@ bp_header (void)
 	bp_number (native_ufs_verified_blocks, 10);
 	bp_emit ('/');
 	bp_number (native_ufs_block_reads, 10);
-	bp_text (" IRQ ");
-	bp_number (mIrqCount, 10);
-	bp_text (" BRK ");
-	bp_number (mBrkCount, 10);
+	bp_text (" FB ");
+	bp_number (sweet_fb_swap_count, 10);
 	bp_emit ('\n');
 	mX = saved_x;
 	mY = saved_y;
