@@ -37,11 +37,11 @@ static volatile unsigned mBrkEsr, mAbortEsr, mAbortFar;
 static volatile int mBeat;
 
 extern volatile uint64_t native_ufs_block_reads;
-extern uint64_t sweet_fb_swap_count;
-extern uint64_t sweet_fb_started;
-extern uint64_t sweet_fb_clients;
-extern uint64_t sweet_surf_calls;
-extern uint32_t sweet_surf_last;
+__attribute__((weak)) uint64_t sweet_fb_swap_count;
+__attribute__((weak)) uint64_t sweet_fb_started;
+__attribute__((weak)) uint64_t sweet_fb_clients;
+__attribute__((weak)) uint64_t sweet_surf_calls;
+__attribute__((weak)) uint32_t sweet_surf_last;
 extern int sheng_crash_log_read (void);
 extern volatile int sheng_crash_log_ready;
 extern char sheng_crash_log_text[];
