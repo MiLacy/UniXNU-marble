@@ -219,11 +219,11 @@ Do not run `flash`, `erase`, `format`, `set_active` or `oem` commands.
 Inputs:
 
 - `boot.img` 169,611,264 bytes, SHA-256
-  `7d8164f3be60dae7485663ff5cb95fe5fc10fdf8745de667c03cb16912de68bd`;
+  `f4bed91e73d2a28773151d9e1e393737cb96e7dffb80e4e94587945bfb940acf`;
 - owner kernel `kernel.macho` SHA-256
-  `6b18e7e92120c47b75abbe626e639b80d39dcf63457ef8849de6bbee7ad590db`;
+  `d1e744df64053ed668af0e1e2b04653669a48e1e225b5cd554287fa00dbd0b52`;
 - `payload.img` 160 MiB, SHA-256
-  `09c8eb58085d76f4c7f0acb8d957c8d85181c12fb82444618e13ca449c9d2bf0`,
+  `b795797d7774b7792f665454e6528a43e82e6912356d465d5d8e00055d52d2f4`,
   payload kernel SHA-256
   `9db2922e7ff9ffea1d7f418a3b87c38d9220080ad152e0fa8a2c6f3c0b7b29a3`;
 - Data seed `data-3g.dbr` SHA-256
@@ -235,6 +235,11 @@ Inputs:
 
 Expected:
 
+- The kernel replaces the loader screen with the bring-up progress page: a
+  once-per-second `ALIVE <s>s UFS <verified>/<reads> IRQ <n> BRK <n>` header
+  (the spinner and the UFS counters move while the boot is running), the
+  `> stage` lines and one line per process exec. A frozen page is a hang; a
+  moving header means the kernel is alive even when nothing else is visible.
 - `NATIVE_UFS` publishes the `OS` and `SystemOS` windows from LBA 59589627.
 - The owner policy verifies every read window and the root volume UUID is
   `04769D26-2CA0-4825-B443-E2E5F88300F2`.
